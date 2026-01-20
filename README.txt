@@ -76,4 +76,4 @@ To verify the security features during the demo:
 - "ModuleNotFoundError": Ensure you ran 'pip install cryptography'.
 
 END OF README
-# ACG CA2
+# ACG CA2 2026
