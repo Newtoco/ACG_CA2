@@ -1,6 +1,4 @@
-==========================================================================
 ST2504 Applied Cryptography - Assignment 2: Secure Vault System
-==========================================================================
 
 --------------------------------------------------------------------------
 1. PREREQUISITES
@@ -77,6 +75,5 @@ To verify the security features during the demo:
 - "FileNotFoundError (Keys)": Ensure you ran keygen.py first.
 - "ModuleNotFoundError": Ensure you ran 'pip install cryptography'.
 
-==========================================================================
 END OF README
-==========================================================================
+# ACG CA2
