@@ -1,0 +1,9 @@
+Flask
+Flask-SQLAlchemy
+Flask-Bcrypt
+PyJWT
+cryptography
+Werkzeug
+pyotp
+qrcode
+pillow
