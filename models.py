@@ -9,6 +9,10 @@ class User(db.Model):
     # Stores the secret key for Google/Microsoft Authenticator
     totp_secret = db.Column(db.String(32), nullable=True)
 
+    # Fields for Brute Force Protection & Account Locking
+    failed_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime, nullable=True)
+
 class AuditLog(db.Model):
     __bind_key__ = 'audit'
     id = db.Column(db.Integer, primary_key=True)
