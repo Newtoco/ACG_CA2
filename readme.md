@@ -19,7 +19,7 @@ A secure, web-based file storage application built with Python and Flask. This s
     * Separate audit database for security compliance.
 * **User Isolation:** 
     * Users can only access and decrypt their own uploaded files.
-    * File naming convention prevents cross-user access.
+    * UUID-based file storage prevents filename collisions and unauthorized access.
 
 ## 📁 Project Structure
 
@@ -41,7 +41,7 @@ ACG_CA2/
 ├── config.py              # Database & App Configuration
 ├── generate_cert.py       # Script to create SSL Certificates
 ├── main.py                # Application Entry Point
-├── models.py              # Database Models (User, AuditLog)
+├── models.py              # Database Models (User, File, AuditLog)
 ├── routes_auth.py         # Authentication Logic (Login/Register/MFA)
 ├── routes_vault.py        # File Operations (Upload/Download/Delete/List)
 ├── utils.py               # Helper functions (Logging, Token validation)
@@ -122,7 +122,8 @@ If SSL certificates are not found, the application will fallback to running on *
 
 ### Database Architecture:
 * **users.db** (User Database):
-  - Stores usernames, bcrypt-hashed passwords, and TOTP secrets
+  - **User Table:** Stores usernames, bcrypt-hashed passwords, and TOTP secrets
+  - **File Table:** Maps original filenames to UUID-based storage names for each user
   - Located in `instance/` directory
 * **audit.db** (Audit Log Database):
   - Immutable log of all user actions (LOGIN, UPLOAD, DELETE)
@@ -140,7 +141,9 @@ If SSL certificates are not found, the application will fallback to running on *
 * **Secret Key:** Configurable in `config.py` (⚠️ Change in production!)
 
 ### File Isolation:
-* Files are prefixed with user ID: `{user_id}_{filename}`
+* Files are stored with UUID-based names (e.g., `a3f5b2c1-4d8e-4a9b-8c7f-123456789abc.pdf`)
+* Database tracks mapping between original filenames and storage names per user
+* Prevents filename collisions when multiple users upload files with the same name
 * Users can only access files they uploaded
 * Unauthorized access attempts are logged
 

@@ -1,7 +1,9 @@
 import os
+import uuid
 from flask import Blueprint, request, jsonify, send_file, render_template
 from werkzeug.utils import secure_filename
-from config import UPLOAD_FOLDER, cipher_suite
+from config import UPLOAD_FOLDER, cipher_suite, db
+from models import File
 from utils import token_required, log_action
 
 vault_bp = Blueprint('vault', __name__)
@@ -18,12 +20,24 @@ def upload(current_user):
     if not file: return jsonify({'message': 'No file'}), 400
     
     filename = secure_filename(file.filename)
-    storage_name = f"{current_user.id}_{filename}"
+    # Generate UUID-based storage name
+    file_uuid = str(uuid.uuid4())
+    file_ext = os.path.splitext(filename)[1]
+    storage_name = f"{file_uuid}{file_ext}"
     
     # Encrypt
     encrypted_data = cipher_suite.encrypt(file.read())
     with open(os.path.join(UPLOAD_FOLDER, storage_name), 'wb') as f:
         f.write(encrypted_data)
+    
+    # Save file record to database
+    file_record = File(
+        user_id=current_user.id,
+        original_filename=filename,
+        storage_name=storage_name
+    )
+    db.session.add(file_record)
+    db.session.commit()
         
     log_action(current_user.id, "UPLOAD", filename)
     return jsonify({'message': 'Uploaded'})
@@ -31,18 +45,23 @@ def upload(current_user):
 @vault_bp.route('/list-files')
 @token_required
 def list_files(current_user):
-    all_files = os.listdir(UPLOAD_FOLDER)
-    user_files = [f.split('_', 1)[1] for f in all_files if f.startswith(f"{current_user.id}_")]
-    return jsonify({'files': user_files})
+    user_files = File.query.filter_by(user_id=current_user.id).all()
+    files_list = [f.original_filename for f in user_files]
+    return jsonify({'files': files_list})
 
 @vault_bp.route('/download', methods=['POST'])
 @token_required
 def download(current_user):
     filename = secure_filename(request.json.get('filename'))
-    storage_name = f"{current_user.id}_{filename}"
-    path = os.path.join(UPLOAD_FOLDER, storage_name)
     
-    if not os.path.exists(path): return jsonify({'message': 'Missing'}), 404
+    # Look up file record in database
+    file_record = File.query.filter_by(user_id=current_user.id, original_filename=filename).first()
+    if not file_record:
+        return jsonify({'message': 'Missing'}), 404
+    
+    path = os.path.join(UPLOAD_FOLDER, file_record.storage_name)
+    if not os.path.exists(path):
+        return jsonify({'message': 'Missing'}), 404
     
     # Decrypt
     with open(path, 'rb') as f:
@@ -60,10 +79,20 @@ def download(current_user):
 @token_required
 def delete(current_user):
     filename = secure_filename(request.json.get('filename'))
-    path = os.path.join(UPLOAD_FOLDER, f"{current_user.id}_{filename}")
+    
+    # Look up file record in database
+    file_record = File.query.filter_by(user_id=current_user.id, original_filename=filename).first()
+    if not file_record:
+        return jsonify({'message': 'Not Found'}), 404
+    
+    path = os.path.join(UPLOAD_FOLDER, file_record.storage_name)
     
     if os.path.exists(path):
         os.remove(path)
-        log_action(current_user.id, "DELETE", filename)
-        return jsonify({'message': 'Deleted'})
-    return jsonify({'message': 'Not Found'}), 404
+    
+    # Delete database record
+    db.session.delete(file_record)
+    db.session.commit()
+    
+    log_action(current_user.id, "DELETE", filename)
+    return jsonify({'message': 'Deleted'})
