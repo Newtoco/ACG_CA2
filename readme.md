@@ -38,6 +38,10 @@ Ensure you have Python 3.8+ installed.
 Open your terminal in the project folder and run:
 
 Bash
+python reset.py
+This resets the folder to it's original state, without key, logs, saved files stored.
+
+Bash
 python -m pip install -r requirements.txt
 3. Generate Security Certificates
 The system requires an SSL certificate to create a secure HTTPS tunnel. Run this script once to generate self-signed keys (cert.pem and key.pem):
