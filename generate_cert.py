@@ -16,11 +16,11 @@ def generate_self_signed_cert():
     
     # 2. Configure the Certificate (Self-Signed)
     subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
-        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"State"),
-        x509.NameAttribute(NameOID.LOCALITY_NAME, u"City"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Secure Vault App"),
-        x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+        x509.NameAttribute(NameOID.COUNTRY_NAME, u"SG"),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"SINGAPORE"),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, u"DOVER"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"SINGAPORE_POLYTECHNIC"),
+        x509.NameAttribute(NameOID.COMMON_NAME, u"GROUP_1_ACG_CA2_SECURE_VAULT_WEBSERVE"),
     ])
     
     cert = x509.CertificateBuilder().subject_name(
