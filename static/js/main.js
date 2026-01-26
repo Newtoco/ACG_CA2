@@ -147,7 +147,7 @@ function renderDashboard(username) {
             <label for="f">Select File to Upload</label>
             <input type="file" id="f">
         </div>
-        <button onclick="uploadFile()" class="success">
+        <button type="button" onclick="uploadFile(event)" class="success">
             <span style="font-size:1.1rem;">↑</span> Upload File
         </button>
         <div id="list">
@@ -179,7 +179,7 @@ function validateInput(input, errorMsg) {
 async function handleLogin() {
     const uInput = document.getElementById('u');
     const pInput = document.getElementById('p');
-    
+
     if (!validateInput(uInput, 'Username is required')) return;
     if (!validateInput(pInput, 'Password is required')) return;
 
@@ -188,18 +188,18 @@ async function handleLogin() {
 
     try {
         const res = await fetch('/login', {
-            method: 'POST', 
+            method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({username: uInput.value, password: pInput.value})
         });
         const data = await res.json();
-        
+
         if(data.otp_required) {
             tempUserId = data.user_id;
             document.getElementById('login-form').classList.add('hidden');
             document.getElementById('mfa-form').classList.remove('hidden');
             showToast('MFA Required', 'Please enter your authenticator code', 'info');
-        } else { 
+        } else {
             showToast('Login Failed', data.message || 'Invalid credentials', 'error');
         }
     } catch(e) {
@@ -297,32 +297,44 @@ async function handleLogout() {
 }
 
 // -- FILE OPERATIONS --
-async function uploadFile() {
+async function uploadFile(event) {
+    //Stop the page from reloading/submitting
+    if (event) event.preventDefault();
+
     const fileInput = document.getElementById('f');
     if (!fileInput.files[0]) {
         showToast('No File Selected', 'Please select a file to upload', 'warning');
         return;
     }
 
-    const btn = event.target;
-    setButtonLoading(btn, true);
+
+    const btn = event ? event.target.closest('button') : null;
+    if (btn) setButtonLoading(btn, true);
 
     try {
         const fd = new FormData();
         fd.append('file', fileInput.files[0]);
+
         const res = await fetch('/upload', { method: 'POST', body: fd });
-        
+
+        // Read the response text from the server
+        const data = await res.json();
+
         if (res.ok) {
+            // Success Case (200 OK)
             fileInput.value = '';
-            showToast('Upload Complete', 'File uploaded successfully', 'success');
+            showToast('Upload Complete', data.message || 'File uploaded', 'success');
             loadFiles();
         } else {
-            showToast('Upload Failed', 'Could not upload file', 'error');
+            // 4. FIX: Handle the Security Error (400 Bad Request)
+            // This displays "Security Alert: File type mismatch..."
+            showToast('Upload Rejected', data.message, 'error', 6000);
         }
     } catch(e) {
-        showToast('Error', 'Upload failed', 'error');
+        console.error(e);
+        showToast('System Error', 'An unexpected connection error occurred', 'error');
     } finally {
-        setButtonLoading(btn, false);
+        if (btn) setButtonLoading(btn, false);
     }
 }
 

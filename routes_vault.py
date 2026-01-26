@@ -32,6 +32,12 @@ def upload(current_user):
         return jsonify({'message': 'Invalid file type detected'}), 400
     
     filename = secure_filename(file.filename)
+
+    # --- NEW CHECK: PREVENT DUPLICATES ---
+    existing_file = File.query.filter_by(user_id=current_user.id, original_filename=filename).first()
+    if existing_file:
+        return jsonify({'message': 'File with this name already exists. Please rename it.'}), 400
+
     # Generate UUID-based storage name
     file_uuid = str(uuid.uuid4())
     file_ext = os.path.splitext(filename)[1]
