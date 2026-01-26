@@ -109,7 +109,6 @@
         });
         
         if (res.ok) {
-            // FIX: Redirect explicitly to the dashboard URL
             window.location.href = '/dashboard';
         } else {
             alert("Invalid Code");
@@ -132,13 +131,34 @@
         } else { alert(data.message); }
     }
 
+    // --- UPDATED UPLOAD FUNCTION ---
     async function uploadFile() {
         const fileInput = document.getElementById('f');
         if (!fileInput.files[0]) return alert("Select a file first");
-        const fd = new FormData(); fd.append('file', fileInput.files[0]);
-        await fetch('/upload', { method: 'POST', body: fd });
-        fileInput.value = ''; loadFiles();
+
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+
+            // Check if server rejected the file (Code 400)
+            if (!res.ok) {
+                alert("Upload Failed: " + data.message);
+                return; // Stop here
+            }
+
+            // Success case
+            alert(data.message);
+            fileInput.value = '';
+            loadFiles();
+        } catch (err) {
+            console.error(err);
+            alert("An error occurred during upload.");
+        }
     }
+    // -------------------------------
 
     async function loadFiles() {
         const res = await fetch('/list-files');
