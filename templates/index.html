@@ -2,190 +2,22 @@
 <html>
 <head>
     <title>Secure Vault (TOTP)</title>
-    <style>
-        body { background: #222; color: #eee; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; height: 100vh; align-items: center; margin: 0; }
-        .container { background: #333; padding: 2rem; border-radius: 12px; width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center;}
-        h2 { border-bottom: 2px solid #555; padding-bottom: 10px; }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: none; box-sizing: border-box; }
-        input { background: #444; color: white; border: 1px solid #555; }
-        button { background: #007bff; color: white; font-weight: bold; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .qr-area { background: white; padding: 10px; margin: 10px auto; display: inline-block; border-radius: 8px;}
-        .hidden { display: none; }
-        #list { max-height: 200px; overflow-y: auto; margin: 15px 0; border: 1px solid #444; background: #2a2a2a; border-radius: 4px; text-align: left; }
-        .file-item { padding: 10px; border-bottom: 1px solid #444; cursor: pointer; font-size: 0.9em; }
-        .file-item:hover { background: #444; }
-        .selected { background: #007bff !important; color: white; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
 <div class="container" id="app"></div>
+<div class="toast-container" id="toast-container"></div>
 
 <script>
+    // Pass template variables to JavaScript
     const mode = "{{ mode }}";
     const username = "{{ username }}";
-    const app = document.getElementById('app');
-    let selectedFile = null;
-    let tempUserId = null;
-
-    if (mode === 'login') renderLogin();
-    else renderDashboard();
-
-    // -- VIEWS --
-    function renderLogin() {
-        app.innerHTML = `
-            <h2>Secure Vault</h2>
-            <div id="login-form">
-                <input type="text" id="u" placeholder="Username">
-                <input type="password" id="p" placeholder="Password">
-                <button onclick="handleLogin()">Login</button>
-                <button onclick="renderRegister()" style="background:#555">Register New Account</button>
-            </div>
-            <div id="mfa-form" class="hidden">
-                <h3>Authenticator Code</h3>
-                <p style="font-size:0.9em; color:#ccc;">Open Google Authenticator and enter code:</p>
-                <input type="text" id="otp-input" placeholder="000 000" style="text-align:center; letter-spacing: 5px; font-size: 1.2em;">
-                <button onclick="submitOtp()">Verify</button>
-            </div>
-        `;
-    }
-
-    function renderRegister() {
-        app.innerHTML = `
-            <h2>Setup Account</h2>
-            <div id="reg-form">
-                <input type="text" id="ru" placeholder="Choose Username">
-                <input type="password" id="rp" placeholder="Choose Password">
-                <button onclick="handleRegister()">Create Account</button>
-                <button onclick="renderLogin()" style="background:#555">Back</button>
-            </div>
-            <div id="qr-display" class="hidden">
-                <h3 style="color:#4caf50">Success!</h3>
-                <p>Scan this with Google Authenticator:</p>
-                <div class="qr-area">
-                    <img id="qr-img" src="" width="150" height="150">
-                </div>
-                <p style="font-size:0.8em; color:#aaa;">Secret: <span id="secret-text"></span></p>
-                <button onclick="renderLogin()">I have scanned it. Go to Login.</button>
-            </div>
-        `;
-    }
-
-    function renderDashboard() {
-        app.innerHTML = `
-            <h2>Vault: ${username}</h2>
-            <input type="file" id="f">
-            <button onclick="uploadFile()">1. Upload File</button>
-            <div id="list">Loading files...</div>
-            <button onclick="downloadFile()">2. Download Selected</button>
-            <button onclick="deleteFile()" style="background:#dc3545">3. Delete Selected</button>
-            <button onclick="handleLogout()" style="background:#555; margin-top:20px">Log Out</button>
-        `;
-        loadFiles();
-    }
-
-    // -- LOGIC --
-    async function handleLogin() {
-        const u = document.getElementById('u').value;
-        const p = document.getElementById('p').value;
-        const res = await fetch('/login', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username: u, password: p})
-        });
-        const data = await res.json();
-        if(data.otp_required) {
-            tempUserId = data.user_id;
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('mfa-form').classList.remove('hidden');
-        } else { alert(data.message); }
-    }
-
-    async function submitOtp() {
-        const code = document.getElementById('otp-input').value;
-        const res = await fetch('/verify-otp', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user_id: tempUserId, otp: code})
-        });
-        
-        if (res.ok) {
-            window.location.href = '/dashboard';
-        } else {
-            alert("Invalid Code");
-        }
-    }
-
-    async function handleRegister() {
-        const u = document.getElementById('ru').value;
-        const p = document.getElementById('rp').value;
-        const res = await fetch('/register', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username: u, password: p})
-        });
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById('reg-form').classList.add('hidden');
-            document.getElementById('qr-display').classList.remove('hidden');
-            document.getElementById('qr-img').src = "data:image/png;base64," + data.qr_code;
-            document.getElementById('secret-text').innerText = data.secret;
-        } else { alert(data.message); }
-    }
-
-    // --- UPDATED UPLOAD FUNCTION ---
-    async function uploadFile() {
-        const fileInput = document.getElementById('f');
-        if (!fileInput.files[0]) return alert("Select a file first");
-
-        const fd = new FormData();
-        fd.append('file', fileInput.files[0]);
-
-        try {
-            const res = await fetch('/upload', { method: 'POST', body: fd });
-            const data = await res.json();
-
-            // Check if server rejected the file (Code 400)
-            if (!res.ok) {
-                alert("Upload Failed: " + data.message);
-                return; // Stop here
-            }
-
-            // Success case
-            alert(data.message);
-            fileInput.value = '';
-            loadFiles();
-        } catch (err) {
-            console.error(err);
-            alert("An error occurred during upload.");
-        }
-    }
-    // -------------------------------
-
-    async function loadFiles() {
-        const res = await fetch('/list-files');
-        const data = await res.json();
-        const listDiv = document.getElementById('list');
-        if (data.files.length === 0) { listDiv.innerHTML = '<div style="padding:10px; color:#888;">No files found.</div>'; return; }
-        listDiv.innerHTML = data.files.map(f => `<div class="file-item" onclick="selectFile('${f}', this)">${f}</div>`).join('');
-    }
-
-    function selectFile(f, el) { selectedFile = f; document.querySelectorAll('.file-item').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); }
-
-    async function downloadFile() {
-        if (!selectedFile) return alert("Select file first");
-        const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: selectedFile}) });
-        if(!res.ok) return alert("Error");
-        const blob = await res.blob();
-        const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = selectedFile; a.click();
-    }
-
-    async function deleteFile() {
-        if (!selectedFile) return alert("Select file first");
-        if (!confirm(`Delete "${selectedFile}"?`)) return;
-        await fetch('/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: selectedFile}) });
-        selectedFile = null; loadFiles();
-    }
-
-    async function handleLogout() { await fetch('/logout', {method: 'POST'}); window.location.href = '/'; }
+</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+    // Initialize the app after loading
+    initApp(mode, username);
 </script>
 </body>
 </html>
