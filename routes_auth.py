@@ -64,6 +64,13 @@ def login():
         return jsonify({'otp_required': True, 'user_id': user.id})
         
     print("DEBUG: Invalid Username or Password")
+    log_action(
+        user_id=user.id if user else None,
+        action="LOGIN_FAILED",
+        username_entered=data.get("username"),
+        success=False,
+        details="BAD_USERNAME_OR_PASSWORD"
+    )
     return jsonify({'message': 'Login Failed'}), 401
 
 @auth_bp.route('/verify-otp', methods=['POST'])
@@ -78,6 +85,13 @@ def verify_otp():
     user = User.query.get(user_id)
     if not user:
         print("DEBUG: User ID not found in DB")
+        log_action(
+            user_id=user.id,
+            action="LOGIN_FAILED",
+            username_entered=user.username,
+            success=False,
+            details="INVALID_OTP"
+        )
         return jsonify({'message': 'User not found'}), 404
         
     # Verify
@@ -95,7 +109,7 @@ def verify_otp():
         
         resp = make_response(jsonify({'message': 'Success'}))
         resp.set_cookie('auth_token', token, httponly=True, secure=True)
-        log_action(user_id, "LOGIN")
+        log_action(user_id, "LOGIN_SUCCESS", username_entered=user.username, success=True)
         return resp
     else:
         print("DEBUG: TOTP Verification Failed. Check Server Time vs Phone Time.")

@@ -4,8 +4,17 @@ from flask import request, jsonify, current_app
 from models import User, AuditLog
 from config import db
 
-def log_action(user_id, action, filename=None):
-    new_log = AuditLog(user_id=user_id, action=action, filename=filename)
+def log_action(user_id, action, filename=None, username_entered=None, success=None, details=None):
+    new_log = AuditLog(
+        user_id=user_id,
+        action=action,
+        filename=filename,
+        username_entered=username_entered,
+        success=success,
+        details=details,
+        ip_address=request.headers.get("X-Forwarded-For", request.remote_addr),
+        user_agent=request.headers.get("User-Agent")
+    )
     db.session.add(new_log)
     db.session.commit()
 

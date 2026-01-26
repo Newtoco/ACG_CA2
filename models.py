@@ -20,7 +20,23 @@ class File(db.Model):
 class AuditLog(db.Model):
     __bind_key__ = 'audit'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, nullable=False)
+
+    # allow null because failed login may not map to a real user
+    user_id = db.Column(db.Integer, nullable=True)
+
+    # e.g. "LOGIN_FAILED", "LOGIN_SUCCESS", "UPLOAD", "DOWNLOAD"
     action = db.Column(db.String(50), nullable=False)
+
+    # file actions
     filename = db.Column(db.String(200), nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # login actions
+    username_entered = db.Column(db.String(80), nullable=True)
+    success = db.Column(db.Boolean, nullable=True)
+    details = db.Column(db.String(255), nullable=True)
+
+    # context
+    ip_address = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(256), nullable=True)
+
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
