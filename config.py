@@ -2,7 +2,7 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 # 1. Initialize the Flask Application
 app = Flask(__name__)
@@ -23,18 +23,15 @@ app.config['SQLALCHEMY_BINDS'] = {
 }
 
 # 4. Encryption Key Setup
-# Checks if a key exists; if not, generates a new one for file encryption.
-KEY_FILE = 'file_key.key'
-if not os.path.exists(KEY_FILE):
-    with open(KEY_FILE, 'wb') as f:
-        f.write(Fernet.generate_key())
 
-# Load the key
-with open(KEY_FILE, 'rb') as f:
-    FILE_ENCRYPTION_KEY = f.read()
-
-# Initialize the Cipher Suite (AES)
-cipher_suite = Fernet(FILE_ENCRYPTION_KEY)
+# Load the raw 32-byte key
+KEY_PATH = "file_key.key"
+if os.path.exists(KEY_PATH):
+    with open(KEY_PATH, "rb") as f:
+        FILE_ENCRYPTION_KEY = f.read()
+# Initialize AES-256-CTR
+def get_ctr_cipher(nonce):
+    return Cipher(algorithms.AES(FILE_ENCRYPTION_KEY), modes.CTR(nonce))
 
 # 5. File Storage Setup
 UPLOAD_FOLDER = 'secure_vault_storage'

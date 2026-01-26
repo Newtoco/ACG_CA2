@@ -3,7 +3,7 @@ import magic
 import uuid
 from flask import Blueprint, request, jsonify, send_file, render_template
 from werkzeug.utils import secure_filename
-from config import UPLOAD_FOLDER, cipher_suite, db
+from config import UPLOAD_FOLDER, get_ctr_cipher, db
 from models import File
 from utils import token_required, log_action
 
@@ -51,7 +51,17 @@ def upload(current_user):
     storage_name = f"{file_uuid}{file_ext}"
     
     # Encrypt
-    encrypted_data = cipher_suite.encrypt(file.read())
+    # 1. Generate a 16-byte nonce (CTR typically uses 16 bytes)
+    nonce = os.urandom(16)
+
+    # 2. Set up the CTR engine
+    cipher = get_ctr_cipher(nonce)
+    encryptor = cipher.encryptor()
+
+    # 3. Encrypt and store (Nonce + Ciphertext)
+    file_data = file.read()
+    encrypted_data = nonce + encryptor.update(file_data) + encryptor.finalize()
+
     with open(os.path.join(UPLOAD_FOLDER, storage_name), 'wb') as f:
         f.write(encrypted_data)
     
@@ -87,16 +97,27 @@ def download(current_user):
     path = os.path.join(UPLOAD_FOLDER, file_record.storage_name)
     if not os.path.exists(path):
         return jsonify({'message': 'Missing'}), 404
-    
+
     # Decrypt
+    # 1. Read the raw data from the storage
     with open(path, 'rb') as f:
-        encrypted_data = f.read()
-    decrypted_data = cipher_suite.decrypt(encrypted_data)
-        
+        raw_data = f.read()
+
+    # 1. Extract the 16-byte nonce
+    nonce = raw_data[:16]
+    ciphertext = raw_data[16:]
+
+    # 2. Set up the CTR engine
+    cipher = get_ctr_cipher(nonce)
+    decryptor = cipher.decryptor()
+
+    # 3. Decrypt
+    decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+
     from io import BytesIO
     return send_file(
-        BytesIO(decrypted_data), 
-        as_attachment=True, 
+        BytesIO(decrypted_data),
+        as_attachment=True,
         download_name=filename
     )
 
