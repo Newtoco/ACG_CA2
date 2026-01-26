@@ -416,10 +416,10 @@ async function deleteFile() {
         `Are you sure you want to delete "${selectedFile}"? This action cannot be undone.`,
         async () => {
             try {
-                await fetch('/delete', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({filename: selectedFile}) 
+                await fetch('/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({filename: selectedFile})
                 });
                 showToast('File Deleted', `${selectedFile} has been deleted`, 'success');
                 selectedFile = null;

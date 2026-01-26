@@ -36,7 +36,14 @@ def upload(current_user):
     # --- NEW CHECK: PREVENT DUPLICATES ---
     existing_file = File.query.filter_by(user_id=current_user.id, original_filename=filename).first()
     if existing_file:
-        return jsonify({'message': 'File with this name already exists. Please rename it.'}), 400
+        # 1. Remove the old physical file from storage
+        old_path = os.path.join(UPLOAD_FOLDER, existing_file.storage_name)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+        # 2. Delete the old database record
+        db.session.delete(existing_file)
+        db.session.commit()
 
     # Generate UUID-based storage name
     file_uuid = str(uuid.uuid4())
