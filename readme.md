@@ -10,7 +10,7 @@ A secure, web-based file storage application built with Python and Flask. This s
     * QR Code generation for easy authenticator app setup.
 * **End-to-End Encryption:**
     * **In-Transit:** HTTPS/TLS Tunnel using SSL certificates (cert.pem & key.pem).
-    * **At-Rest:** Files are encrypted with Fernet (AES-128 CBC) before being saved to disk.
+    * **At-Rest:** Files are encrypted with Fernet (AES-256 CTR) before being saved to disk.
 * **Session Management:** 
     * Secure, HTTPOnly cookies using JSON Web Tokens (JWT).
     * 30-minute session expiry with automatic token validation.
