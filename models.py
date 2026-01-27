@@ -9,14 +9,40 @@ class User(db.Model):
     # Stores the secret key for Google/Microsoft Authenticator
     totp_secret = db.Column(db.String(32), nullable=True)
 
-    # Fields for Brute Force Protection & Account Locking
+    # --- Brute Force Protection ---
     failed_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime, nullable=True)
 
+# --- File Storage System ---
+class File(db.Model):
+    __bind_key__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    original_filename = db.Column(db.String(200), nullable=False)
+    storage_name = db.Column(db.String(200), unique=True, nullable=False)
+    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+# ---Enhanced Audit Logs ---
 class AuditLog(db.Model):
     __bind_key__ = 'audit'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, nullable=False)
+
+    # allow null because failed login may not map to a real user
+    user_id = db.Column(db.Integer, nullable=True)
+
+    # e.g. "LOGIN_FAILED", "LOGIN_SUCCESS", "UPLOAD", "DOWNLOAD"
     action = db.Column(db.String(50), nullable=False)
+
+    # file actions
     filename = db.Column(db.String(200), nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # login actions
+    username_entered = db.Column(db.String(80), nullable=True)
+    success = db.Column(db.Boolean, nullable=True)
+    details = db.Column(db.String(255), nullable=True)
+
+    # context
+    ip_address = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(256), nullable=True)
+
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
