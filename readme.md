@@ -17,7 +17,7 @@ A secure, web-based file storage application built with Python and Flask. This s
 - **Non-Repudiation:**
   - All actions (Login, Upload, Delete) are recorded in an immutable Audit Log.
   - Separate audit database for security compliance.
-  - **Admin Dashboard:** Dedicated interface for administrators to view system-wide audit logs.
+  - **Admin Dashboard:** Dedicated interface for administrators to view system-wide audit logs..
 - **User Isolation:**
   - Users can only access and decrypt their own uploaded files.
   - UUID-based file storage prevents filename collisions and unauthorized access.
