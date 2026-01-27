@@ -1,9 +1,11 @@
 from config import app, db
 from routes_auth import auth_bp
 from routes_vault import vault_bp
+from view_logs import view_logs_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(vault_bp)
+app.register_blueprint(view_logs_bp)
 
 if __name__ == '__main__':
     with app.app_context():

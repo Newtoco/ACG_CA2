@@ -159,6 +159,7 @@ function renderDashboard(username) {
         <button onclick="deleteFile()" class="danger">
             <span style="font-size:1.1rem;">🗑</span> Delete Selected
         </button>
+        ${username === 'admin' ? `<button onclick="viewSystemLogs()" class="warning" style="margin-top:10px">🛡️ View Audit Logs</button>` : ''}
         <button onclick="handleLogout()" class="secondary" style="margin-top:20px">Log Out</button>
     `;
     loadFiles();
@@ -429,4 +430,46 @@ async function deleteFile() {
             }
         }
     );
+}
+
+async function viewSystemLogs() {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+        <h2>🛡️ System Audit Logs</h2>
+        <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em;">
+                <thead>
+                    <tr style="background: #333; color: #fff; text-align: left;">
+                        <th style="padding: 10px;">Time</th>
+                        <th style="padding: 10px;">Action</th>
+                        <th style="padding: 10px;">User</th>
+                        <th style="padding: 10px;">Details</th>
+                    </tr>
+                </thead>
+                <tbody id="log-rows">
+                    <tr><td colspan="4" style="padding:20px; text-align:center;">Loading logs...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <button onclick="renderDashboard('admin')" class="secondary">Back to Dashboard</button>
+    `;
+
+    try {
+        const res = await fetch('/logs/all');
+        if (!res.ok) throw new Error('Access Denied');
+        const logs = await res.json();
+        
+        const rowsHtml = logs.map(l => `
+            <tr style="border-bottom: 1px solid #ccc;">
+                <td style="padding: 8px;">${new Date(l.timestamp).toLocaleString()}</td>
+                <td style="padding: 8px;"><strong>${l.action}</strong></td>
+                <td style="padding: 8px;">${l.username_entered || (l.user_id ? 'ID: ' + l.user_id : 'System')}</td>
+                <td style="padding: 8px;">${l.filename ? 'File: ' + l.filename : ''} ${l.details || ''}</td>
+            </tr>
+        `).join('');
+        
+        document.getElementById('log-rows').innerHTML = rowsHtml || '<tr><td colspan="4" style="padding:20px; text-align:center;">No logs found.</td></tr>';
+    } catch (e) {
+        showToast('Error', 'Could not fetch logs', 'error');
+    }
 }
