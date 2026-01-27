@@ -134,7 +134,13 @@ function renderRegister() {
             </div>
             <p class="info-text">Or enter this secret manually:</p>
             <div class="secret-box" id="secret-text"></div>
-            <button onclick="renderLogin()" class="success">Continue to Login</button>
+            <p class="info-text" style="margin-top: 20px; color: var(--accent-warning);">⚠️ Please confirm your authenticator code below before continuing:</p>
+            <div class="input-group">
+                <label for="reg-otp-input">Enter 6-digit code from your authenticator:</label>
+                <input type="text" id="reg-otp-input" placeholder="000 000" maxlength="7" style="text-align:center; letter-spacing: 5px; font-size: 1.2em;">
+            </div>
+            <button onclick="confirmOtpRegistration()" class="success">Verify & Complete Registration</button>
+            <button onclick="renderLogin()" class="secondary">Back to Login</button>
         </div>
     `;
 }
@@ -245,6 +251,51 @@ async function submitOtp() {
     }
 }
 
+async function confirmOtpRegistration() {
+    /**
+     * FUNCTION: Called during registration to verify OTP before completing signup.
+     * This is a separate endpoint from login OTP verification.
+     */
+    const otpInput = document.getElementById('reg-otp-input');
+    const code = otpInput.value.replace(/\s/g, '');
+    
+    if (code.length !== 6) {
+        showToast('Invalid Code', 'Please enter a 6-digit code', 'error');
+        otpInput.classList.add('error');
+        setTimeout(() => otpInput.classList.remove('error'), 500);
+        return;
+    }
+
+    const btn = event.target;
+    setButtonLoading(btn, true);
+
+    try {
+        const res = await fetch('/confirm-otp-registration', {
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: tempUserId, otp: code})
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast('Success', 'Registration complete! Redirecting to login...', 'success', 1500);
+            setTimeout(() => {
+                renderLogin();
+                showToast('Ready to Login', 'You can now log in with your credentials', 'info', 2000);
+            }, 1500);
+        } else {
+            showToast('Invalid Code', data.message || 'The code you entered is incorrect', 'error');
+            otpInput.value = '';
+            otpInput.focus();
+        }
+    } catch(e) {
+        showToast('Error', 'Connection failed', 'error');
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
 async function handleRegister() {
     const uInput = document.getElementById('ru');
     const pInput = document.getElementById('rp');
@@ -271,11 +322,20 @@ async function handleRegister() {
         const data = await res.json();
         
         if (res.ok) {
+            // Store user_id for OTP confirmation step
+            tempUserId = data.user_id;
+            
             document.getElementById('reg-form').classList.add('hidden');
             document.getElementById('qr-display').classList.remove('hidden');
             document.getElementById('qr-img').src = "data:image/png;base64," + data.qr_code;
             document.getElementById('secret-text').innerText = data.secret;
-            showToast('Success', 'Account created successfully!', 'success');
+            
+            // Focus on OTP input field
+            setTimeout(() => {
+                document.getElementById('reg-otp-input').focus();
+            }, 300);
+            
+            showToast('Success', 'Account created! Scan QR code and confirm OTP.', 'success');
         } else { 
             showToast('Registration Failed', data.message || 'Could not create account', 'error');
         }

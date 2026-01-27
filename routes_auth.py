@@ -83,7 +83,14 @@ def register():
         buf.seek(0)
         img_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
         
-        return jsonify({'message': 'Registered', 'qr_code': img_b64, 'secret': secret})
+        # Return user_id for OTP confirmation step (instead of redirecting to login immediately)
+        return jsonify({
+            'message': 'Registered - Confirm OTP',
+            'qr_code': img_b64,
+            'secret': secret,
+            'user_id': user.id,
+            'otp_confirmation_required': True
+        }), 201
     except Exception as e:
         return jsonify({'message': 'User already exists or Database Error'}), 400
 
@@ -179,6 +186,35 @@ def verify_otp():
         return resp
     else:
         return jsonify({'message': 'Invalid 2FA Code'}), 401
+
+#additional feature of confirmation of OTP during registration
+@auth_bp.route('/confirm-otp-registration', methods=['POST'])
+def confirm_otp_registration():
+    """
+    New endpoint: Allows users to test their OTP during registration before redirecting to login.
+    This happens AFTER they scan the QR code but BEFORE they're taken to the login page.
+    """
+    data = request.json
+    user_id = data.get('user_id')
+    input_code = data.get('otp')
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    
+    # Verify TOTP
+    totp = pyotp.TOTP(user.totp_secret)
+    if totp.verify(input_code):
+        log_action(user_id, "REGISTRATION_OTP_CONFIRMED", username_entered=user.username, success=True)
+        return jsonify({
+            'message': 'OTP Confirmed! Registration complete. You can now log in.',
+            'success': True
+        }), 200
+    else:
+        return jsonify({
+            'message': 'Invalid OTP Code. Please try again.',
+            'success': False
+        }), 401
 
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
