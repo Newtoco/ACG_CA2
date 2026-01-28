@@ -113,6 +113,13 @@ def verify_otp():
         return resp
     else:
         print("DEBUG: TOTP Verification Failed. Check Server Time vs Phone Time.")
+        log_action(
+            user_id=user.id,
+            action="LOGIN_FAILED",
+            username_entered=user.username,
+            success=False,
+            details="INVALID_2FA CODE"
+        )
         return jsonify({'message': 'Invalid 2FA Code'}), 401
 
 @auth_bp.route('/logout', methods=['POST'])
