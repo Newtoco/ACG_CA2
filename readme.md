@@ -15,7 +15,7 @@ A secure, web-based file storage application built with Python and Flask. This s
   - Secure, HTTPOnly cookies using JSON Web Tokens (JWT).
   - 30-minute session expiry with automatic token validation.
 - **Non-Repudiation:**
-  - All actions (Login, Upload, Delete) are recorded in an immutable Audit Log.
+  - All actions (Login, Upload, Download, Delete) are recorded in an immutable Audit Log.
   - Separate audit database for security compliance.
   - **Admin Dashboard:** Dedicated interface for administrators to view system-wide audit logs..
 - **User Isolation:**
@@ -130,7 +130,7 @@ If SSL certificates are not found, the application will fallback to running on *
 - **Download:** Click a file to decrypt and retrieve it.
 - **Delete:** Permanently remove a file from storage.
 - **List Files:** View all files you've uploaded.
-- **View Audit Logs:** (Admin Only) Access the system-wide audit log to monitor user activity (Login/Upload/Delete), timestamps, and IP addresses.
+- **View Audit Logs:** (Admin Only) Access the system-wide audit log to monitor user activity (Login/Upload/Download/Delete), timestamps, and IP addresses. Includes filtering by user and action type.
 
 ## 🛡️ Security Details
 
@@ -147,7 +147,7 @@ If SSL certificates are not found, the application will fallback to running on *
   - **File Table:** Maps original filenames to UUID-based storage names for each user
   - Located in `instance/` directory
 - **audit.db** (Audit Log Database):
-  - Immutable log of all user actions (LOGIN, UPLOAD, DELETE)
+  - Immutable log of all user actions (LOGIN, UPLOAD, DOWNLOAD, DELETE)
   - Timestamp-based for forensic analysis
 
 ### Network Security:
