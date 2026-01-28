@@ -200,7 +200,7 @@ The application requires the following Python packages (from `requirements.txt`)
 - **Flask-SQLAlchemy** - ORM for database management
 - **Flask-Bcrypt** - Password hashing
 - **PyJWT** - JSON Web Token implementation
-- **cryptography** - Fernet encryption
+- **cryptography** - AES-256 CTR encryption (Hazmat primitives)
 - **Werkzeug** - Secure filename handling
 - **pyotp** - TOTP implementation
 - **qrcode** - QR code generation

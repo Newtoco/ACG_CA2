@@ -55,7 +55,7 @@ function showConfirmModal(title, message, onConfirm) {
             <div class="modal-body">${message}</div>
             <div class="modal-footer">
                 <button class="secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-                <button class="danger" id="modal-confirm">Delete</button>
+                <button class="danger" id="modal-confirm">Overwrite</button>
             </div>
         </div>
     `;
@@ -298,37 +298,48 @@ async function handleLogout() {
 }
 
 // -- FILE OPERATIONS --
-async function uploadFile(event) {
-    //Stop the page from reloading/submitting
+async function uploadFile(event, isOverwrite = false) {
     if (event) event.preventDefault();
 
     const fileInput = document.getElementById('f');
-    if (!fileInput.files[0]) {
+    const file = fileInput.files[0];
+
+    if (!file && !isOverwrite) {
         showToast('No File Selected', 'Please select a file to upload', 'warning');
         return;
     }
 
-
-    const btn = event ? event.target.closest('button') : null;
+    const btn = document.querySelector('button.success');
     if (btn) setButtonLoading(btn, true);
 
     try {
         const fd = new FormData();
-        fd.append('file', fileInput.files[0]);
+        // If we are retrying, we use the file we already have in the input
+        fd.append('file', file);
 
-        const res = await fetch('/upload', { method: 'POST', body: fd });
+        // Append the overwrite flag to the URL if this is a second attempt
+        const url = isOverwrite ? '/upload?overwrite=true' : '/upload';
 
-        // Read the response text from the server
+        const res = await fetch(url, { method: 'POST', body: fd });
         const data = await res.json();
 
         if (res.ok) {
-            // Success Case (200 OK)
             fileInput.value = '';
-            showToast('Upload Complete', data.message || 'File uploaded', 'success');
+            showToast('Success', data.message || 'File uploaded', 'success');
             loadFiles();
-        } else {
-            // 4. FIX: Handle the Security Error (400 Bad Request)
-            // This displays "Security Alert: File type mismatch..."
+        }
+        else if (res.status === 409) {
+            // --- THE NEW LOGIC: HANDLE CONFLICT ---
+            showConfirmModal(
+                'Overwrite File?',
+                `${file.name} already exists. Do you want to replace the existing version?`,
+                () => {
+                    // User clicked "Delete/Confirm" - call itself with overwrite flag
+                    uploadFile(null, true);
+                }
+            );
+        }
+        else {
             showToast('Upload Rejected', data.message, 'error', 6000);
         }
     } catch(e) {
@@ -338,7 +349,6 @@ async function uploadFile(event) {
         if (btn) setButtonLoading(btn, false);
     }
 }
-
 async function loadFiles() {
     try {
         const res = await fetch('/list-files');

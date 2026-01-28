@@ -35,15 +35,22 @@ def upload(current_user):
 
     # --- NEW CHECK: PREVENT DUPLICATES ---
     existing_file = File.query.filter_by(user_id=current_user.id, original_filename=filename).first()
-    if existing_file:
-        # 1. Remove the old physical file from storage
+
+    # Check for an 'overwrite' flag in the request (e.g., from a query param or JSON body)
+    overwrite = request.args.get('overwrite') == 'true'
+
+    if existing_file and not overwrite:
+        return jsonify({
+            "status": "conflict",
+            "message": f"A file named {filename} already exists. Overwrite?"
+        }), 409
+
+    if existing_file and overwrite:
+        # Proceed with your deletion logic
         old_path = os.path.join(UPLOAD_FOLDER, existing_file.storage_name)
         if os.path.exists(old_path):
             os.remove(old_path)
-
-        # 2. Delete the old database record
         db.session.delete(existing_file)
-        db.session.commit()
 
     # Generate UUID-based storage name
     file_uuid = str(uuid.uuid4())
