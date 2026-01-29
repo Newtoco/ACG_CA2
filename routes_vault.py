@@ -3,7 +3,7 @@ import magic
 import uuid
 from flask import Blueprint, request, jsonify, send_file, render_template
 from werkzeug.utils import secure_filename
-from config import UPLOAD_FOLDER, get_ctr_cipher, db
+from config import UPLOAD_FOLDER, get_gcm_cipher, db
 from models import File
 from utils import token_required, log_action
 
@@ -56,21 +56,26 @@ def upload(current_user):
     file_uuid = str(uuid.uuid4())
     file_ext = os.path.splitext(filename)[1]
     storage_name = f"{file_uuid}{file_ext}"
-    
-    # Encrypt
-    # 1. Generate a 16-byte nonce (CTR typically uses 16 bytes)
-    nonce = os.urandom(16)
 
-    # 2. Set up the CTR engine
-    cipher = get_ctr_cipher(nonce)
+    # Encrypt
+    # 1. Generate a 12-byte nonce (Standard for GCM)
+    nonce = os.urandom(12)
+
+    # 2. Set up the GCM engine (from your updated config)
+    # Note: tag is None during encryption
+    cipher = get_gcm_cipher(nonce)
     encryptor = cipher.encryptor()
 
-    # 3. Encrypt and store (Nonce + Ciphertext)
+    # 3. Encrypt and extract the Tag
     file_data = file.read()
-    encrypted_data = nonce + encryptor.update(file_data) + encryptor.finalize()
+    ciphertext = encryptor.update(file_data) + encryptor.finalize()
+    tag = encryptor.tag
+
+    # 4. Store as: [Nonce(12)][Tag(16)][Ciphertext(...)]
+    encrypted_blob = nonce + tag + ciphertext
 
     with open(os.path.join(UPLOAD_FOLDER, storage_name), 'wb') as f:
-        f.write(encrypted_data)
+        f.write(encrypted_blob)
     
     # Save file record to database
     file_record = File(
@@ -106,20 +111,28 @@ def download(current_user):
         return jsonify({'message': 'Missing'}), 404
 
     # Decrypt
-    # 1. Read the raw data from the storage
+    # 1. Read the raw data
     with open(path, 'rb') as f:
         raw_data = f.read()
 
-    # 1. Extract the 16-byte nonce
-    nonce = raw_data[:16]
-    ciphertext = raw_data[16:]
+    # 2. Extract components based on the GCM structure
+    # Nonce = 12 bytes, Tag = 16 bytes, Ciphertext = the rest
+    nonce = raw_data[:12]
+    tag = raw_data[12:28]
+    ciphertext = raw_data[28:]
 
-    # 2. Set up the CTR engine
-    cipher = get_ctr_cipher(nonce)
+    # 3. Set up the GCM engine (Pass both nonce AND tag)
+    cipher = get_gcm_cipher(nonce, tag)
     decryptor = cipher.decryptor()
 
-    # 3. Decrypt
-    decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+    # 4. Decrypt and Verify
+    try:
+        # If the tag doesn't match the ciphertext, .finalize() raises InvalidTag
+        decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+    except Exception as e:
+        # This is where GCM shines: it catches tampering!
+        log_action(current_user.id, "DECRYPT_FAILURE", f"Integrity check failed for {filename}")
+        return jsonify({'message': 'File corrupted or tampered with'}), 400
 
     log_action(current_user.id, "DOWNLOAD", filename)
 
