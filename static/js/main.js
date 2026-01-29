@@ -134,7 +134,13 @@ function renderRegister() {
             </div>
             <p class="info-text">Or enter this secret manually:</p>
             <div class="secret-box" id="secret-text"></div>
-            <button onclick="renderLogin()" class="success">Continue to Login</button>
+            <p class="info-text" style="margin-top: 20px; color: var(--accent-warning);">⚠️ Please confirm your authenticator code below before continuing:</p>
+            <div class="input-group">
+                <label for="reg-otp-input">Enter 6-digit code from your authenticator:</label>
+                <input type="text" id="reg-otp-input" placeholder="000 000" maxlength="7" style="text-align:center; letter-spacing: 5px; font-size: 1.2em;">
+            </div>
+            <button onclick="confirmOtpRegistration()" class="success">Verify & Complete Registration</button>
+            <button onclick="renderLogin()" class="secondary">Back to Login</button>
         </div>
     `;
 }
@@ -246,6 +252,51 @@ async function submitOtp() {
     }
 }
 
+async function confirmOtpRegistration() {
+    /**
+     * FUNCTION: Called during registration to verify OTP before completing signup.
+     * This is a separate endpoint from login OTP verification.
+     */
+    const otpInput = document.getElementById('reg-otp-input');
+    const code = otpInput.value.replace(/\s/g, '');
+    
+    if (code.length !== 6) {
+        showToast('Invalid Code', 'Please enter a 6-digit code', 'error');
+        otpInput.classList.add('error');
+        setTimeout(() => otpInput.classList.remove('error'), 500);
+        return;
+    }
+
+    const btn = event.target;
+    setButtonLoading(btn, true);
+
+    try {
+        const res = await fetch('/confirm-otp-registration', {
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: tempUserId, otp: code})
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast('Success', 'Registration complete! Redirecting to login...', 'success', 1500);
+            setTimeout(() => {
+                renderLogin();
+                showToast('Ready to Login', 'You can now log in with your credentials', 'info', 2000);
+            }, 1500);
+        } else {
+            showToast('Invalid Code', data.message || 'The code you entered is incorrect', 'error');
+            otpInput.value = '';
+            otpInput.focus();
+        }
+    } catch(e) {
+        showToast('Error', 'Connection failed', 'error');
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
 async function handleRegister() {
     const uInput = document.getElementById('ru');
     const pInput = document.getElementById('rp');
@@ -272,11 +323,20 @@ async function handleRegister() {
         const data = await res.json();
         
         if (res.ok) {
+            // Store user_id for OTP confirmation step
+            tempUserId = data.user_id;
+            
             document.getElementById('reg-form').classList.add('hidden');
             document.getElementById('qr-display').classList.remove('hidden');
             document.getElementById('qr-img').src = "data:image/png;base64," + data.qr_code;
             document.getElementById('secret-text').innerText = data.secret;
-            showToast('Success', 'Account created successfully!', 'success');
+            
+            // Focus on OTP input field
+            setTimeout(() => {
+                document.getElementById('reg-otp-input').focus();
+            }, 300);
+            
+            showToast('Success', 'Account created! Scan QR code and confirm OTP.', 'success');
         } else { 
             showToast('Registration Failed', data.message || 'Could not create account', 'error');
         }
@@ -442,44 +502,160 @@ async function deleteFile() {
     );
 }
 
-async function viewSystemLogs() {
+async function viewSystemLogs() { // Completely new log viewer
     const app = document.getElementById('app');
     app.innerHTML = `
+        <style>
+            #app {
+                max-width: 95% !important;
+                width: 95% !important;
+            }
+            .log-table-container {
+                overflow-x: auto;
+                margin-top: 15px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            .log-table {
+                width: 100%;
+                border-collapse: collapse;
+                min-width: 600px;
+            }
+            .log-table th, .log-table td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid #eee;
+                vertical-align: top;
+                word-wrap: break-word;
+                max-width: 400px; /* Prevents overflow */
+            }
+            .log-table th { background-color: #f9f9f9; font-weight: 600; }
+            .log-table tr:hover { background-color: #000000; }
+        </style>
         <h2>🛡️ System Audit Logs</h2>
-        <div style="overflow-x:auto;">
-            <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em;">
-                <thead>
-                    <tr style="background: #333; color: #fff; text-align: left;">
-                        <th style="padding: 10px;">Time</th>
-                        <th style="padding: 10px;">Action</th>
-                        <th style="padding: 10px;">User</th>
-                        <th style="padding: 10px;">Details</th>
-                    </tr>
-                </thead>
-                <tbody id="log-rows">
-                    <tr><td colspan="4" style="padding:20px; text-align:center;">Loading logs...</td></tr>
-                </tbody>
-            </table>
+        
+        <div class="tabs">
+            <button class="tab-link active" onclick="openTab(event, 'AllActions')">User Activity</button>
+            <button class="tab-link" onclick="openTab(event, 'FailedLogins')">Failed Logins</button>
         </div>
-        <button onclick="renderDashboard('admin')" class="secondary">Back to Dashboard</button>
+
+        <div id="AllActions" class="tab-content" style="display:block;">
+            <h3>Filter Activity</h3>
+            <div class="filter-bar">
+                <input type="text" id="log-user-filter" placeholder="Filter by username...">
+                <select id="log-action-filter">
+                    <option value="">All Actions</option>
+                    <option value="LOGIN_SUCCESS">Successful Logins</option>
+                    <option value="UPLOAD">File Uploads</option>
+                    <option value="DOWNLOAD">File Downloads</option>
+                    <option value="DELETE">File Deletes</option>
+                </select>
+                <button onclick="fetchFilteredLogs()">Search</button>
+            </div>
+            <div id="all-logs-table" class="log-table-container"></div>
+        </div>
+
+        <div id="FailedLogins" class="tab-content">
+            <h3>Filter Failed Logins</h3>
+            <div class="filter-bar">
+                <input type="text" id="failed-log-user-filter" placeholder="Filter by username entered...">
+                <button onclick="fetchFailedLoginLogs()">Search</button>
+            </div>
+            <div id="failed-logs-table" class="log-table-container"></div>
+        </div>
+
+        <button onclick="renderDashboard('admin')" class="secondary" style="margin-top:20px;">Back to Dashboard</button>
     `;
 
+    // Initial load
+    fetchFilteredLogs();
+    fetchFailedLoginLogs();
+}
+
+function openTab(evt, tabName) {
+    let i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tab-link");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+}
+
+async function fetchFilteredLogs() {
+    const container = document.getElementById('all-logs-table');
+    container.innerHTML = '<div class="spinner-large"></div>';
+
+    const username = document.getElementById('log-user-filter').value;
+    const action = document.getElementById('log-action-filter').value;
+    
+    const params = new URLSearchParams();
+    if (username) params.append('username', username);
+    if (action) params.append('action', action);
+
     try {
-        const res = await fetch('/logs/all');
+        const res = await fetch('/logs/all?' + params.toString());
         if (!res.ok) throw new Error('Access Denied');
         const logs = await res.json();
         
+        const headers = ['Time', 'Action', 'User', 'Details', 'IP Address'];
         const rowsHtml = logs.map(l => `
-            <tr style="border-bottom: 1px solid #ccc;">
-                <td style="padding: 8px;">${new Date(l.timestamp).toLocaleString()}</td>
-                <td style="padding: 8px;"><strong>${l.action}</strong></td>
-                <td style="padding: 8px;">${l.username_entered || (l.user_id ? 'ID: ' + l.user_id : 'System')}</td>
-                <td style="padding: 8px;">${l.filename ? 'File: ' + l.filename : ''} ${l.details || ''}</td>
+            <tr>
+                <td>${new Date(l.timestamp).toLocaleString()}</td>
+                <td><strong>${l.action}</strong></td>
+                <td>${l.username_entered || (l.user_id ? 'ID: ' + l.user_id : 'System')}</td>
+                <td>${(l.filename ? `File: <strong>${l.filename}</strong>` : '')} ${l.details || ''}</td>
+                <td>${l.ip_address || 'N/A'}</td>
             </tr>
         `).join('');
         
-        document.getElementById('log-rows').innerHTML = rowsHtml || '<tr><td colspan="4" style="padding:20px; text-align:center;">No logs found.</td></tr>';
+        container.innerHTML = `
+            <table class="log-table">
+                <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                <tbody>${rowsHtml || '<tr><td colspan="5">No logs found for this filter.</td></tr>'}</tbody>
+            </table>
+        `;
     } catch (e) {
         showToast('Error', 'Could not fetch logs', 'error');
+        container.innerHTML = '<div class="empty-state">Error loading logs.</div>';
+    }
+}
+
+async function fetchFailedLoginLogs() {
+    const container = document.getElementById('failed-logs-table');
+    container.innerHTML = '<div class="spinner-large"></div>';
+    
+    const username = document.getElementById('failed-log-user-filter').value;
+    const params = new URLSearchParams();
+    if (username) params.append('username', username);
+
+    try {
+        const res = await fetch('/logs/failed-logins?' + params.toString());
+        if (!res.ok) throw new Error('Access Denied');
+        const logs = await res.json();
+        
+        const headers = ['Time', 'Username Entered', 'Details', 'IP Address'];
+        const rowsHtml = logs.map(l => `
+            <tr>
+                <td>${new Date(l.timestamp).toLocaleString()}</td>
+                <td>${l.username_entered || 'N/A'}</td>
+                <td>${l.details || ''}</td>
+                <td>${l.ip_address || 'N/A'}</td>
+            </tr>
+        `).join('');
+        
+        container.innerHTML = `
+            <table class="log-table">
+                <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                <tbody>${rowsHtml || '<tr><td colspan="4">No failed login logs found.</td></tr>'}</tbody>
+            </table>
+        `;
+    } catch (e) {
+        showToast('Error', 'Could not fetch failed logs', 'error');
+        container.innerHTML = '<div class="empty-state">Error loading logs.</div>';
     }
 }

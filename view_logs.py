@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from utils import token_required
-from models import AuditLog
+from models import AuditLog, User
 
 view_logs_bp = Blueprint("view_logs", __name__)
 
@@ -36,7 +36,24 @@ def all_logs(current_user):
         return jsonify({"message": "Forbidden"}), 403
 
     limit = min(int(request.args.get("limit", 100)), 500)
-    rows = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    username = request.args.get("username")
+    action_filter = request.args.get("action")
+
+    query = AuditLog.query
+
+    if username:
+        user = User.query.filter(User.username.ilike(f"%{username}%")).first()
+        if user:
+            query = query.filter(AuditLog.user_id == user.id)
+        else:
+            # If a username filter is specified but the user doesn't exist, return no results.
+            return jsonify([])
+
+    if action_filter:
+        # Allow filtering by a single action, e.g., action=UPLOAD
+        query = query.filter(AuditLog.action == action_filter)
+
+    rows = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
 
     return jsonify([
         {

@@ -121,6 +121,8 @@ def download(current_user):
     # 3. Decrypt
     decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
 
+    log_action(current_user.id, "DOWNLOAD", filename)
+
     from io import BytesIO
     return send_file(
         BytesIO(decrypted_data),
