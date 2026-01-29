@@ -4,8 +4,14 @@ This script cleans up all generated files and databases to reset the application
 """
 
 import os
+import sys
 import shutil
 from pathlib import Path
+
+# Get project root directory (parent of scripts folder)
+script_dir = Path(__file__).parent
+project_root = script_dir.parent
+os.chdir(project_root)
 
 def delete_file(filepath):
     """Delete a file if it exists."""

@@ -4,19 +4,26 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import datetime
-import os  # Added for key generation
+import os
+import sys
+from pathlib import Path
+
+# Add parent directory to path and change to project root
+script_dir = Path(__file__).parent
+project_root = script_dir.parent
+os.chdir(project_root)
 
 
 def generate_everything():
     print("Generating secure certificates and master keys...")
 
-    # --- 1. Generate Private Key (RSA-4096) ---
+    # --- Generate Private Key (RSA-4096) ---
     key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=4096,
     )
 
-    # --- 2. Configure the Certificate (Self-Signed) ---
+    # --- Configure the Certificate (Self-Signed) ---
     subject = issuer = x509.Name([
         x509.NameAttribute(NameOID.COUNTRY_NAME, u"SG"),
         x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"SINGAPORE"),

@@ -40,20 +40,17 @@ A secure, web-based file storage application built with Python and Flask. This s
   - System reset utility for complete data cleanup
   - Admin user creation script for programmatic setup
 
-##  Project Structure
+## 📁 Project Structure
+
+### Initial Files (Repository)
 
 ````text
 ACG_CA2/
-├── secure_vault_storage/   # Encrypted files storage directory
-├── backups/                # Audit database backups (auto-created)
-├── instance/               # SQLite database files (auto-generated)
-│   ├── users.db           # User credentials & TOTP secrets
-│   └── audit.db           # Audit logs (immutable)
-├── keys/                   # RSA key pairs (created by keygen.py)
-│   ├── server_private.pem
-│   ├── server_public.pem
-│   ├── client_private.pem
-│   └── client_public.pem
+├── scripts/               # Utility and maintenance scripts
+│   ├── backup_audit_db.py # Audit database backup with rotation
+│   ├── create_admin.py    # Admin user creation script
+│   ├── generate_cert.py   # SSL certificate & encryption key generator
+│   └── reset.py           # System reset (cleans all data)
 ├── static/                # Frontend assets
 │   ├── css/
 │   │   └── style.css     # Application styling
@@ -64,24 +61,57 @@ ACG_CA2/
 ├── utils/                 # Cryptographic utilities
 │   ├── crypto_utils.py    # Hybrid encryption & digital signature functions
 │   └── keygen.py          # RSA key pair generation script
-├── backup_audit_db.py     # Audit database backup script with rotation
+├── .gitignore             # Git ignore file (prevents committing sensitive data)
 ├── config.py              # Database & App Configuration
-├── create_admin.py        # Script to create admin user programmatically
-├── generate_cert.py       # Script to create SSL Certificates
 ├── main.py                # Application Entry Point
 ├── models.py              # Database Models (User, File, AuditLog)
-├── reset.py               # System reset script (cleans all data)
+├── readme.md              # This file
 ├── requirements.txt       # Python Dependencies
 ├── routes_auth.py         # Authentication Logic (Login/Register/MFA)
 ├── routes_vault.py        # File Operations (Upload/Download/Delete/List)
 ├── utils.py               # Helper functions (Logging, Token validation)
 └── view_logs.py           # Admin audit log viewing endpoints
+````
+
+### Generated Files & Directories
+
+These are created automatically by scripts or when the application runs:
+
+````text
+# Created by scripts/generate_cert.py:
+├── cert.pem               # SSL certificate (self-signed)
+├── key.pem                # SSL private key
+└── file_key.key           # AES-256 master encryption key (32 bytes)
+                           # ⚠️ These files are in .gitignore - never commit to version control!
+
+# Created by utils/keygen.py (optional):
+└── keys/                  # RSA key pairs directory
+    ├── server_private.pem # Server RSA private key (2048-bit)
+    ├── server_public.pem  # Server RSA public key
+    ├── client_private.pem # Client RSA private key (2048-bit)
+    └── client_public.pem  # Client RSA public key
+                           # ⚠️ These files are also in .gitignore
+
+# Auto-created on first run (by config.py & models):
+├── secure_vault_storage/  # Encrypted files storage directory
+└── instance/              # SQLite database files
+    ├── users.db          # User credentials, TOTP secrets, file mappings
+    └── audit.db          # Immutable audit logs
+                          # ⚠️ Databases contain sensitive user data - protected by .gitignore
+
+# Created by scripts/backup_audit_db.py (on-demand):
+└── backups/               # Audit database backups with timestamps
+    └── audit_YYYYMMDD_HHMMSS.db  # Timestamped backup files (keeps last 10)
+                                  # ⚠️ Backups are also protected by .gitignore
 
 ##  Installation & Setup
 
 ### 1. Prerequisites
 * Python 3.8+ installed
 * pip (Python package manager)
+* Git (for version control - optional but recommended)
+
+**🔒 Security Note:** The project includes a `.gitignore` file that prevents accidentally committing sensitive files (certificates, keys, databases, uploaded files) to version control. Never remove or modify this file without understanding the security implications.
 
 ### 2. Install Dependencies
 Open your terminal in the project folder and run:
@@ -95,7 +125,7 @@ python -m pip install -r requirements.txt
 The system requires an SSL certificate to create a secure HTTPS tunnel. Run this script once to generate self-signed keys (cert.pem and key.pem):
 
 ```bash
-python generate_cert.py
+python scripts/generate_cert.py
 ```
 
 ### 4. (Optional) Generate RSA Key Pairs
@@ -113,7 +143,7 @@ This creates RSA key pairs in the `keys/` directory for advanced encryption scen
 To reset the application to its original state (removes all databases, keys, logs, and saved files):
 
 ```bash
-python reset.py
+python scripts/reset.py
 ```
 
 **⚠️ Warning:** This will permanently delete all user accounts, uploaded files, and audit logs!
@@ -123,7 +153,7 @@ python reset.py
 To programmatically create an admin account (useful for initial setup):
 
 ```bash
-python create_admin.py
+python scripts/create_admin.py
 ```
 
 This will output the admin credentials and the **TOTP Secret** which you must manually enter into your Authenticator App.
@@ -133,7 +163,7 @@ This will output the admin credentials and the **TOTP Secret** which you must ma
 To create a backup of the audit database with automatic rotation:
 
 ```bash
-python backup_audit_db.py
+python scripts/backup_audit_db.py
 ```
 
 This maintains up to 10 most recent backups in the `backups/` directory.
@@ -261,21 +291,42 @@ If SSL certificates are not found, the application will fallback to running on *
 
 ## Configuration
 
-### Key Files Generated on First Run:
+### Files Generated by Scripts
 
-- `cert.pem` - SSL certificate (self-signed for development)
+**By `scripts/generate_cert.py` (Run before first start):**
+- `cert.pem` - SSL certificate (self-signed, 4096-bit RSA, valid 365 days)
 - `key.pem` - SSL private key
+- `file_key.key` - AES-256 master encryption key (32 random bytes)
+
+**By `utils/keygen.py` (Optional, for hybrid cryptography):**
+- `keys/server_private.pem` - RSA 2048-bit private key for server
+- `keys/server_public.pem` - RSA public key for server
+- `keys/client_private.pem` - RSA 2048-bit private key for client
+- `keys/client_public.pem` - RSA public key for client
+
+**By `scripts/backup_audit_db.py` (Run on-demand):**
+- `backups/audit_YYYYMMDD_HHMMSS.db` - Timestamped backup (keeps 10 most recent)
+
+### Files Auto-Generated on Application Startup
+
+**By `config.py` (when imported):**
+- `secure_vault_storage/` - Directory for encrypted file storage
+
+**By `main.py` via `db.create_all()` (first run):**
 - `instance/users.db` - User database (credentials, TOTP secrets, file mappings)
 - `instance/audit.db` - Audit log database (immutable activity records)
-- `secure_vault_storage/` - Directory for encrypted files
 
-### Key Files Generated on Demand:
+### Files Removed by `scripts/reset.py`
 
-- `keys/server_private.pem` - RSA private key for server (via keygen.py)
-- `keys/server_public.pem` - RSA public key for server (via keygen.py)
-- `keys/client_private.pem` - RSA private key for client (via keygen.py)
-- `keys/client_public.pem` - RSA public key for client (via keygen.py)
-- `backups/audit_*.db` - Timestamped audit database backups (via backup_audit_db.py)
+When you run `python scripts/reset.py`, it removes:
+- `cert.pem`, `key.pem`, `file_key.key` (certificates and encryption key)
+- All files in `secure_vault_storage/` (encrypted user files)
+- All `.db` files in `instance/` (databases)
+- All files in `__pycache__/` (Python cache)
+
+**Note:** `reset.py` does NOT delete:
+- RSA keys in `keys/` directory
+- Audit backups in `backups/` directory
 
 ### Important Settings in `config.py`:
 
@@ -354,7 +405,7 @@ This configuration is made for learning and testing as according to assignment r
 ### Lost Encryption Key:
 
 - **Problem:** Encryption key configuration lost or corrupted
-- **Solution:**  All encrypted files are unrecoverable without the key. Run `python reset.py` to start fresh (deletes all data).
+- **Solution:**  All encrypted files are unrecoverable without the key. Run `python scripts/reset.py` to start fresh (deletes all data).
 
 ### Admin Cannot See Logs:
 
