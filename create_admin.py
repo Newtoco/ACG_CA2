@@ -39,15 +39,13 @@ def create_admin():
         
         # Generate and display QR code in the terminal
         totp_uri = pyotp.totp.TOTP(totp_secret).provisioning_uri(name=username, issuer_name="SecureVault")
-        
-        print("[+] Scan the QR code with your authenticator app:")
-        qr = qrcode.QRCode(border=1)
+        qr = qrcode.QRCode()
         qr.add_data(totp_uri)
-        qr.print_ascii(invert=True)
-        
-        print("-" * 40)
-        print(f"[+] Or, enter this secret manually: {totp_secret}")
-        print("-" * 40)
+        qr.print_ascii()
+
+        print("\n[!] IMPORTANT: Scan the QR code with an authenticator app (e.g., Google Authenticator).")
+        print("[!] Change your password after logging in for the first time.")
+        print(f"[!] TOTP Secret (backup): {totp_secret}")
 
 if __name__ == "__main__":
     create_admin()

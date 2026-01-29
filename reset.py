@@ -77,7 +77,7 @@ def main():
     print("=" * 60)
     print("\nThis will delete all generated files and reset the application.\n")
     
-    # Get the script's directory
+    # Get the current directory
     base_dir = Path(__file__).parent
     
     # Files to delete
@@ -94,20 +94,16 @@ def main():
     print("\n3. Clearing instance databases...")
     clear_database_directory(base_dir / "instance")
     
-    # Clear __pycache__
-    print("\n4. Clearing Python cache...")
-    clear_directory(base_dir / "__pycache__")
+    # Clear backups
+    print("\n4. Clearing backup files...")
+    clear_directory(base_dir / "backups")
     
     print("\n" + "=" * 60)
-    print("RESET COMPLETE!")
+    print("RESET COMPLETE")
     print("=" * 60)
-    print("\nYou can now run the application with a fresh start.")
-    print("Remember to run 'python generate_cert.py' before starting the server.")
+    print("\n[!] You can now run generate_cert.py to regenerate certificates.")
+    print("[!] Then run create_admin.py to create a new admin user.")
+    print("[!] Finally, start the application with python main.py")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\nReset cancelled by user.")
-    except Exception as e:
-        print(f"\n\nUnexpected error: {e}")
+    main()

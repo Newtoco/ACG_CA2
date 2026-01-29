@@ -4,19 +4,19 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import datetime
-import os  # Added for key generation
+import os
 
 
 def generate_everything():
     print("Generating secure certificates and master keys...")
 
-    # --- 1. Generate Private Key (RSA-4096) ---
+    # --- Generate Private Key (RSA-4096) ---
     key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=4096,
     )
 
-    # --- 2. Configure the Certificate (Self-Signed) ---
+    # --- Configure the Certificate (Self-Signed) ---
     subject = issuer = x509.Name([
         x509.NameAttribute(NameOID.COUNTRY_NAME, u"SG"),
         x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"SINGAPORE"),
@@ -42,24 +42,28 @@ def generate_everything():
         critical=False,
     ).sign(key, hashes.SHA256())
 
-    # --- 3. Write 'key.pem' and 'cert.pem' to disk (Transit Security) ---
+    # --- Save Private Key to file ---
     with open("key.pem", "wb") as f:
         f.write(key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption(),
+            encryption_algorithm=serialization.NoEncryption()
         ))
 
+    # --- Save Certificate to file ---
     with open("cert.pem", "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
-    # --- 4. NEW: Generate AES-256 Master Key (At-Rest Security) ---
-    # This generates exactly 32 raw bytes to fix your ValueError
+    print("✓ SSL/TLS Private Key: key.pem")
+    print("✓ SSL/TLS Certificate: cert.pem")
+
+    # --- Generate Master File Encryption Key (AES-256) ---
+    file_key = os.urandom(32)
     with open("file_key.key", "wb") as f:
-        f.write(os.urandom(32))
+        f.write(file_key)
 
-    print("Success! Created 'cert.pem', 'key.pem', and 'file_key.key'.")
-
+    print("✓ File Encryption Key: file_key.key")
+    print("\n[!] KEEP THESE FILES SECURE AND DO NOT COMMIT TO GIT!")
 
 if __name__ == "__main__":
     generate_everything()

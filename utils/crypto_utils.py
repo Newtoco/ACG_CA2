@@ -1,7 +1,8 @@
 import os
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
+from Crypto.Random import get_random_bytes
 
 def load_private_key(path):
     with open(path, "rb") as key_file:
@@ -14,18 +15,22 @@ def load_public_key(path):
 # --- HYBRID ENCRYPTION HELPERS ---
 
 def generate_aes_key():
-    """Generates a random 32-byte AES key (Fernet compliant)"""
-    return Fernet.generate_key()
+    """Generates a random 32-byte AES-256 key"""
+    return os.urandom(32)
 
 def encrypt_file_aes(file_data, aes_key):
-    """Encrypts file data using AES (Symmetric)"""
-    f = Fernet(aes_key)
-    return f.encrypt(file_data)
+    """Encrypts file data using AES-256-GCM (authenticated encryption)"""
+    aesgcm = AESGCM(aes_key)
+    nonce = os.urandom(12)  # GCM standard nonce size
+    ciphertext = aesgcm.encrypt(nonce, file_data, None)
+    return nonce + ciphertext  # Return nonce + ciphertext (includes auth tag)
 
 def decrypt_file_aes(encrypted_data, aes_key):
-    """Decrypts file data using AES (Symmetric)"""
-    f = Fernet(aes_key)
-    return f.decrypt(encrypted_data)
+    """Decrypts file data using AES-256-GCM (verifies authentication)"""
+    aesgcm = AESGCM(aes_key)
+    nonce = encrypted_data[:12]
+    ciphertext = encrypted_data[12:]
+    return aesgcm.decrypt(nonce, ciphertext, None)  # Raises exception if tampered
 
 def encrypt_aes_key_rsa(aes_key, receiver_public_key):
     """Encrypts the AES key using the Receiver's Public RSA Key (Confidentiality)"""
