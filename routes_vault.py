@@ -1,11 +1,15 @@
 import os
 import magic
 import uuid
+import base64
 from flask import Blueprint, request, jsonify, send_file, render_template
 from werkzeug.utils import secure_filename
-from config import UPLOAD_FOLDER, get_ctr_cipher, db
+from config import UPLOAD_FOLDER, get_gcm_cipher, db
 from models import File
 from utils import token_required, log_action
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
 
 vault_bp = Blueprint('vault', __name__)
 
@@ -50,17 +54,47 @@ def upload(current_user):
     file_ext = os.path.splitext(filename)[1]
     storage_name = f"{file_uuid}{file_ext}"
     
-    # Encrypt
-    # Generate a 16-byte nonce (AES-CTR typically uses 16 bytes)
-    nonce = os.urandom(16)
+    # Encrypt using AES-256-GCM (provides encryption + authentication)
+    # Generate a 12-byte nonce (GCM standard)
+    nonce = os.urandom(12)
 
-    # Set up of CTR engine
-    cipher = get_ctr_cipher(nonce)
-    encryptor = cipher.encryptor()
+    # Get GCM cipher
+    cipher = get_gcm_cipher()
 
-    # Encrypt and store (Nonce + Ciphertext)
+    # Read and encrypt file data
     file_data = file.read()
-    encrypted_data = nonce + encryptor.update(file_data) + encryptor.finalize()
+    
+    # --- NON-REPUDIATION: Sign the original file data ---
+    signature_b64 = None
+    if current_user.private_key:  # Check if user has RSA keys (backward compatibility)
+        try:
+            # Load user's private key
+            private_key = serialization.load_pem_private_key(
+                current_user.private_key.encode('utf-8'),
+                password=None
+            )
+            
+            # Sign the original file data (before encryption)
+            signature = private_key.sign(
+                file_data,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            
+            # Encode signature as base64 for storage
+            signature_b64 = base64.b64encode(signature).decode('utf-8')
+        except Exception as e:
+            # Log but don't fail - backward compatibility
+            print(f"Warning: Failed to sign file: {e}")
+    
+    # GCM encrypt returns ciphertext with 16-byte authentication tag appended
+    ciphertext = cipher.encrypt(nonce, file_data, None)
+    
+    # Store: nonce + ciphertext (which includes auth tag)
+    encrypted_data = nonce + ciphertext
 
     with open(os.path.join(UPLOAD_FOLDER, storage_name), 'wb') as f:
         f.write(encrypted_data)
@@ -69,7 +103,8 @@ def upload(current_user):
     file_record = File(
         user_id=current_user.id,
         original_filename=filename,
-        storage_name=storage_name
+        storage_name=storage_name,
+        signature=signature_b64  # Store signature for non-repudiation
     )
     db.session.add(file_record)
     db.session.commit()
@@ -103,18 +138,56 @@ def download(current_user):
     with open(path, 'rb') as f:
         raw_data = f.read()
 
-    # Extract the 16-byte nonce
-    nonce = raw_data[:16]
-    ciphertext = raw_data[16:]
+    # Extract the 12-byte nonce (GCM uses 12-byte nonces)
+    nonce = raw_data[:12]
+    ciphertext = raw_data[12:]  # Includes 16-byte auth tag at the end
 
-    # Set up the CTR engine
-    cipher = get_ctr_cipher(nonce)
-    decryptor = cipher.decryptor()
+    # Get GCM cipher
+    cipher = get_gcm_cipher()
 
-    # Decrypt
-    decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+    # Decrypt and verify authentication tag
+    # This will raise an exception if the file has been tampered with
+    try:
+        decrypted_data = cipher.decrypt(nonce, ciphertext, None)
+    except Exception as e:
+        log_action(current_user.id, "DOWNLOAD_FAILED", filename, 
+                  details=f"Authentication verification failed - file may be corrupted or tampered")
+        return jsonify({'message': 'File integrity check failed - possible tampering detected'}), 403
 
-    log_action(current_user.id, "DOWNLOAD", filename)
+    # --- NON-REPUDIATION: Verify the digital signature ---
+    if file_record.signature and current_user.public_key:  # Check if signature exists (backward compatibility)
+        try:
+            # Load user's public key
+            public_key = serialization.load_pem_public_key(
+                current_user.public_key.encode('utf-8')
+            )
+            
+            # Decode the signature from base64
+            signature = base64.b64decode(file_record.signature)
+            
+            # Verify the signature against the decrypted data
+            public_key.verify(
+                signature,
+                decrypted_data,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            
+            # Signature verified successfully
+            log_action(current_user.id, "DOWNLOAD", filename, 
+                      details="File signature verified - non-repudiation confirmed")
+        except Exception as e:
+            # Signature verification failed
+            log_action(current_user.id, "DOWNLOAD_FAILED", filename, 
+                      details=f"Signature verification failed - possible file tampering or wrong user")
+            return jsonify({'message': 'Signature verification failed - file may have been tampered with or does not belong to you'}), 403
+    else:
+        # No signature available (old files or users without keys)
+        log_action(current_user.id, "DOWNLOAD", filename, 
+                  details="Downloaded without signature verification (legacy file)")
 
     from io import BytesIO
     return send_file(

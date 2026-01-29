@@ -9,6 +9,8 @@ from flask import Blueprint, request, jsonify, make_response, render_template
 from config import db, bcrypt
 from models import User
 from utils import log_action
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 
 
 auth_bp = Blueprint('auth', __name__)
@@ -63,6 +65,25 @@ def register():
     hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
     secret = pyotp.random_base32()
     
+    # Generate RSA key pair for non-repudiation
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+    public_key = private_key.public_key()
+    
+    # Serialize keys to PEM format
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    ).decode('utf-8')
+    
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode('utf-8')
+    
     try:
         # 'failed_attempts' and 'locked_until' are required in models.py to prevent brute force of credentials
         user = User(
@@ -70,7 +91,9 @@ def register():
             password=hashed_pw, 
             totp_secret=secret,
             failed_attempts=0, 
-            locked_until=None
+            locked_until=None,
+            private_key=private_pem,
+            public_key=public_pem
         )
         db.session.add(user)
         db.session.commit()

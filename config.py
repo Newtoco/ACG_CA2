@@ -2,7 +2,7 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # 1. Initialize the Flask Application
 app = Flask(__name__)
@@ -23,14 +23,16 @@ app.config['SQLALCHEMY_BINDS'] = {
 }
 
 # Encryption Key Setup for ensuring security at rest
-# Load the raw 32-byte key
+# Load the raw 32-byte key for AES-256-GCM
 KEY_PATH = "file_key.key"
 if os.path.exists(KEY_PATH):
     with open(KEY_PATH, "rb") as f:
         FILE_ENCRYPTION_KEY = f.read()
-# Initialize AES-256-CTR
-def get_ctr_cipher(nonce):
-    return Cipher(algorithms.AES(FILE_ENCRYPTION_KEY), modes.CTR(nonce))
+
+# Initialize AES-256-GCM (provides encryption + authentication)
+def get_gcm_cipher():
+    """Returns AESGCM cipher for authenticated encryption"""
+    return AESGCM(FILE_ENCRYPTION_KEY)
 
 # File Storage Setup for secure file management
 UPLOAD_FOLDER = 'secure_vault_storage'

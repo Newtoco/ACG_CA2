@@ -224,20 +224,38 @@ If SSL certificates are not found, the application will fallback to running on *
 ### Encryption:
 
 **Symmetric Encryption (File Storage):**
-- **Algorithm:** AES-256 in CTR (Counter) mode
-- **Nonce:** Unique 16-byte random nonce for each file
-- **Storage Format:** `[16-byte nonce][encrypted data]`
-- **Key Storage:** Master encryption key stored in environment/configuration
-- **CRITICAL:** Do not lose the encryption key or all encrypted data will be unrecoverable!
+- **Algorithm:** AES-256-GCM (Galois/Counter Mode) - Authenticated Encryption
+- **Nonce:** Unique 12-byte random nonce for each file (GCM standard)
+- **Authentication:** 16-byte authentication tag automatically generated and verified
+- **Storage Format:** `[12-byte nonce][encrypted data + 16-byte auth tag]`
+- **Key Storage:** Master encryption key stored in file_key.key (32 bytes)
+- **Integrity Protection:** Automatic tamper detection - decryption fails if file modified
+- **⚠️ CRITICAL:** Do not lose the encryption key or all encrypted data will be unrecoverable!
+
+**Why AES-GCM:**
+- ✅ **Authenticated Encryption:** Provides both confidentiality and integrity
+- ✅ **Tamper Detection:** Automatically detects any modifications to encrypted files
+- ✅ **Modern Standard:** Used in TLS 1.3, IPsec, and secure messaging
+- ✅ **High Performance:** Fastest authenticated encryption mode
+- ✅ **Single Operation:** Encryption and authentication in one step
 
 **Hybrid Encryption (Available via crypto_utils):**
 - **RSA-OAEP:** 2048-bit RSA keys for encrypting AES session keys
-- **AES-Fernet:** Symmetric encryption for file data
-- **Use Case:** Confidentiality with key exchange capabilities
+- **AES-256-GCM:** Authenticated symmetric encryption for file data
+- **Use Case:** Confidentiality with key exchange and integrity verification
 
-**Digital Signatures:**
-- **RSA-PSS with SHA-256:** For non-repudiation and integrity verification
-- **Signature Validation:** Verify data authenticity using sender's public key
+**Digital Signatures (Non-Repudiation at Rest):**
+- **RSA-PSS with SHA-256:** Each file is digitally signed by the uploader
+- **Key Generation:** Unique 2048-bit RSA key pair generated during user registration
+- **Signature Process:** Original file data signed with user's private key before encryption
+- **Storage:** Base64-encoded signature stored in database with file metadata
+- **Verification:** Signature verified during download using user's public key
+- **Guarantees:**
+  - ✅ **Non-Repudiation:** Cryptographic proof of who uploaded each file
+  - ✅ **Integrity:** Detects if file content was modified after upload
+  - ✅ **Authenticity:** Confirms file was uploaded by the claimed user
+  - ✅ **Accountability:** User cannot deny uploading a signed file
+- **Backward Compatibility:** Legacy files without signatures can still be downloaded
 
 ### File Security:
 

@@ -13,6 +13,10 @@ class User(db.Model):
     failed_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime, nullable=True)
 
+    # --- Non-Repudiation: RSA Key Pair (nullable for backward compatibility) ---
+    private_key = db.Column(db.Text, nullable=True)  # PEM-encoded RSA private key
+    public_key = db.Column(db.Text, nullable=True)   # PEM-encoded RSA public key
+
 # --- File Storage System ---
 class File(db.Model):
     __bind_key__ = 'users'
@@ -21,6 +25,9 @@ class File(db.Model):
     original_filename = db.Column(db.String(200), nullable=False)
     storage_name = db.Column(db.String(200), unique=True, nullable=False)
     upload_date = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # --- Non-Repudiation: Digital Signature (nullable for backward compatibility) ---
+    signature = db.Column(db.Text, nullable=True)  # Base64-encoded RSA-PSS signature
 
 # ---Enhanced Audit Logs ---
 class AuditLog(db.Model):
