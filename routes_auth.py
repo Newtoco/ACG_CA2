@@ -5,7 +5,7 @@ import pyotp
 import qrcode
 import io
 import base64
-from flask import Blueprint, request, jsonify, make_response, render_template
+from flask import Blueprint, request, jsonify, make_response, render_template, current_app
 from config import db, bcrypt
 from models import User
 from utils import log_action
@@ -102,6 +102,13 @@ def login():
 
     # --- SANITIZATION ---
     if not is_safe_input(username):
+        log_action(
+            user_id=None,
+            action="LOGIN_FAILED",
+            username_entered=username,
+            success=False,
+            details="INVALID_CHARACTERS_IN_USERNAME"
+        )
         return jsonify({'message': 'Invalid characters in username'}), 400
 
     user = User.query.filter_by(username=username).first()
@@ -128,10 +135,16 @@ def login():
             if user.failed_attempts >= 5:
                 user.locked_until = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
                 db.session.commit()
-                log_action(user.id, "SECURITY_LOCKOUT")
                 return jsonify({'message': 'Security Alert: Too many failed attempts. Account locked for 15 minutes.'}), 403
             
             db.session.commit()
+            log_action(
+                user_id=user.id,
+                action="LOGIN_FAILED",
+                username_entered=username,
+                success=False,
+                details="BAD_USERNAME_OR_PASSWORD"
+            )
             return jsonify({'message': 'Invalid Credentials'}), 401
             
     print(f"DEBUG: Login attempt for {data.get('username')}")
@@ -146,11 +159,11 @@ def login():
     log_action(
         user_id=user.id if user else None,
         action="LOGIN_FAILED",
-        username_entered=data.get("username"),
+        username_entered=data.get('username'),
         success=False,
         details="BAD_USERNAME_OR_PASSWORD"
     )
-    return jsonify({'message': 'Login Failed'}), 401
+    return jsonify({'message': 'Invalid Credentials'}), 401
 
 @auth_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
@@ -180,7 +193,6 @@ def verify_otp():
         
         resp = make_response(jsonify({'message': 'Success'}))
         resp.set_cookie('auth_token', token, httponly=True, secure=True, samesite='Strict') # Guarantees the cookie is never sent over unencrypted HTTP (prevents sniffing)
-        log_action(user_id, "LOGIN_SUCCESS")
         resp.set_cookie('auth_token', token, httponly=True, secure=True)
         log_action(user_id, "LOGIN_SUCCESS", username_entered=user.username, success=True)
         return resp
@@ -226,6 +238,29 @@ def confirm_otp_registration():
 
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
+    token = request.cookies.get('auth_token')
+
+    username = None
+    if token:
+        try:
+            decoded = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=["HS256"])
+            user_id = decoded.get("user_id")
+            if user_id:
+                user = User.query.get(user_id)
+                if user:
+                    username = user.username
+        except Exception:
+            # token invalid/expired - still proceed to clear cookie
+            username = None
+
+    # log logout
+    if username:
+        log_action(
+            user_id=decoded.get("user_id"),
+            action="LOGOUT",
+            username_entered=username,
+            success=True
+        )
     resp = make_response(jsonify({'message': 'Logged out'}))
     resp.set_cookie('auth_token', '', expires=0)
     return resp

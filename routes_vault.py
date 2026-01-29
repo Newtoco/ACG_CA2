@@ -1,7 +1,7 @@
 import os
 from flask import Blueprint, request, jsonify, send_file, render_template
 from werkzeug.utils import secure_filename
-from config import UPLOAD_FOLDER, cipher_suite
+from config import UPLOAD_FOLDER, get_ctr_cipher, db
 from utils import token_required, log_action
 
 vault_bp = Blueprint('vault', __name__)
