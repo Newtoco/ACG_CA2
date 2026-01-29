@@ -40,7 +40,7 @@ A secure, web-based file storage application built with Python and Flask. This s
   - System reset utility for complete data cleanup
   - Admin user creation script for programmatic setup
 
-## 📁 Project Structure
+##  Project Structure
 
 ### Initial Files (Repository)
 
@@ -82,7 +82,7 @@ These are created automatically by scripts or when the application runs:
 ├── cert.pem               # SSL certificate (self-signed)
 ├── key.pem                # SSL private key
 └── file_key.key           # AES-256 master encryption key (32 bytes)
-                           # ⚠️ These files are in .gitignore - never commit to version control!
+                           #  These files are in .gitignore - never commit to version control!
 
 # Created by utils/keygen.py (optional):
 └── keys/                  # RSA key pairs directory
@@ -90,19 +90,19 @@ These are created automatically by scripts or when the application runs:
     ├── server_public.pem  # Server RSA public key
     ├── client_private.pem # Client RSA private key (2048-bit)
     └── client_public.pem  # Client RSA public key
-                           # ⚠️ These files are also in .gitignore
+                           #  These files are also in .gitignore
 
 # Auto-created on first run (by config.py & models):
 ├── secure_vault_storage/  # Encrypted files storage directory
 └── instance/              # SQLite database files
     ├── users.db          # User credentials, TOTP secrets, file mappings
     └── audit.db          # Immutable audit logs
-                          # ⚠️ Databases contain sensitive user data - protected by .gitignore
+                          #  Databases contain sensitive user data - protected by .gitignore
 
 # Created by scripts/backup_audit_db.py (on-demand):
 └── backups/               # Audit database backups with timestamps
     └── audit_YYYYMMDD_HHMMSS.db  # Timestamped backup files (keeps last 10)
-                                  # ⚠️ Backups are also protected by .gitignore
+                                  #  Backups are also protected by .gitignore
 
 ##  Installation & Setup
 
@@ -111,7 +111,7 @@ These are created automatically by scripts or when the application runs:
 * pip (Python package manager)
 * Git (for version control - optional but recommended)
 
-**🔒 Security Note:** The project includes a `.gitignore` file that prevents accidentally committing sensitive files (certificates, keys, databases, uploaded files) to version control. Never remove or modify this file without understanding the security implications.
+** Security Note:** The project includes a `.gitignore` file that prevents accidentally committing sensitive files (certificates, keys, databases, uploaded files) to version control. Never remove or modify this file without understanding the security implications.
 
 ### 2. Install Dependencies
 Open your terminal in the project folder and run:
@@ -146,7 +146,7 @@ To reset the application to its original state (removes all databases, keys, log
 python scripts/reset.py
 ```
 
-**⚠️ Warning:** This will permanently delete all user accounts, uploaded files, and audit logs!
+** Warning:** This will permanently delete all user accounts, uploaded files, and audit logs!
 
 ### 6. (Optional) Create Admin User
 
@@ -168,7 +168,7 @@ python scripts/backup_audit_db.py
 
 This maintains up to 10 most recent backups in the `backups/` directory.
 
-## 🏃‍♂️ How to Run
+## How to Run
 
 ### Start the Server:
 
