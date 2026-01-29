@@ -1,11 +1,5 @@
-import os, glob, shutil, sys
+import os, glob, shutil
 from datetime import datetime
-from pathlib import Path
-
-# Add parent directory to path for imports
-script_dir = Path(__file__).parent
-project_root = script_dir.parent
-os.chdir(project_root)
 
 AUDIT_DB = os.path.join("instance", "audit.db")
 BACKUP_DIR = os.path.join("backups")

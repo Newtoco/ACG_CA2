@@ -244,18 +244,9 @@ If SSL certificates are not found, the application will fallback to running on *
 - **AES-256-GCM:** Authenticated symmetric encryption for file data
 - **Use Case:** Confidentiality with key exchange and integrity verification
 
-**Digital Signatures (Non-Repudiation at Rest):**
-- **RSA-PSS with SHA-256:** Each file is digitally signed by the uploader
-- **Key Generation:** Unique 2048-bit RSA key pair generated during user registration
-- **Signature Process:** Original file data signed with user's private key before encryption
-- **Storage:** Base64-encoded signature stored in database with file metadata
-- **Verification:** Signature verified during download using user's public key
-- **Guarantees:**
-  - ✅ **Non-Repudiation:** Cryptographic proof of who uploaded each file
-  - ✅ **Integrity:** Detects if file content was modified after upload
-  - ✅ **Authenticity:** Confirms file was uploaded by the claimed user
-  - ✅ **Accountability:** User cannot deny uploading a signed file
-- **Backward Compatibility:** Legacy files without signatures can still be downloaded
+**Digital Signatures:**
+- **RSA-PSS with SHA-256:** For non-repudiation and integrity verification
+- **Signature Validation:** Verify data authenticity using sender's public key
 
 ### File Security:
 

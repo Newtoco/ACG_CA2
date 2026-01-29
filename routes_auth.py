@@ -9,8 +9,6 @@ from flask import Blueprint, request, jsonify, make_response, render_template
 from config import db, bcrypt
 from models import User
 from utils import log_action
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
 
 
 auth_bp = Blueprint('auth', __name__)
@@ -65,25 +63,6 @@ def register():
     hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
     secret = pyotp.random_base32()
     
-    # Generate RSA key pair for non-repudiation
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048
-    )
-    public_key = private_key.public_key()
-    
-    # Serialize keys to PEM format
-    private_pem = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
-    ).decode('utf-8')
-    
-    public_pem = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
-    ).decode('utf-8')
-    
     try:
         # 'failed_attempts' and 'locked_until' are required in models.py to prevent brute force of credentials
         user = User(
@@ -91,9 +70,7 @@ def register():
             password=hashed_pw, 
             totp_secret=secret,
             failed_attempts=0, 
-            locked_until=None,
-            private_key=private_pem,
-            public_key=public_pem
+            locked_until=None
         )
         db.session.add(user)
         db.session.commit()
@@ -155,25 +132,24 @@ def login():
                 return jsonify({'message': 'Security Alert: Too many failed attempts. Account locked for 15 minutes.'}), 403
             
             db.session.commit()
+            log_action(
+                user_id=user.id,
+                action="LOGIN_FAILED",
+                username_entered=username,
+                success=False,
+                details="INVALID_PASSWORD"
+            )
             return jsonify({'message': 'Invalid Credentials'}), 401
-            
-    print(f"DEBUG: Login attempt for {data.get('username')}")
     
-    user = User.query.filter_by(username=data.get('username')).first()
-    
-    if user and bcrypt.check_password_hash(user.password, data.get('password')):
-        print(f"DEBUG: Password OK. Requesting OTP for User ID {user.id}")
-        return jsonify({'otp_required': True, 'user_id': user.id})
-        
-    print("DEBUG: Invalid Username or Password")
+    # User not found
     log_action(
-        user_id=user.id if user else None,
+        user_id=None,
         action="LOGIN_FAILED",
-        username_entered=data.get("username"),
+        username_entered=username,
         success=False,
-        details="BAD_USERNAME_OR_PASSWORD"
+        details="USER_NOT_FOUND"
     )
-    return jsonify({'message': 'Login Failed'}), 401
+    return jsonify({'message': 'Invalid Credentials'}), 401
 
 @auth_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():

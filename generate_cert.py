@@ -5,13 +5,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import datetime
 import os
-import sys
-from pathlib import Path
-
-# Add parent directory to path and change to project root
-script_dir = Path(__file__).parent
-project_root = script_dir.parent
-os.chdir(project_root)
 
 
 def generate_everything():
@@ -49,23 +42,28 @@ def generate_everything():
         critical=False,
     ).sign(key, hashes.SHA256())
 
-    # --- Write 'key.pem' and 'cert.pem' (Transit Security) ---
+    # --- Save Private Key to file ---
     with open("key.pem", "wb") as f:
         f.write(key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption(),
+            encryption_algorithm=serialization.NoEncryption()
         ))
 
+    # --- Save Certificate to file ---
     with open("cert.pem", "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
-    # --- Generate AES-256 Master Key for file encryption (Security at rest) ---
+    print("✓ SSL/TLS Private Key: key.pem")
+    print("✓ SSL/TLS Certificate: cert.pem")
+
+    # --- Generate Master File Encryption Key (AES-256) ---
+    file_key = os.urandom(32)
     with open("file_key.key", "wb") as f:
-        f.write(os.urandom(32))
+        f.write(file_key)
 
-    print("Success! Created 'cert.pem', 'key.pem', and 'file_key.key'.")
-
+    print("✓ File Encryption Key: file_key.key")
+    print("\n[!] KEEP THESE FILES SECURE AND DO NOT COMMIT TO GIT!")
 
 if __name__ == "__main__":
     generate_everything()
