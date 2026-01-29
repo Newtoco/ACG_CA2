@@ -16,7 +16,7 @@ def dashboard(current_user):
 
 def validate_file_type(file_storage):
     header = file_storage.read(2048)
-    file_storage.seek(0) # CRITICAL: Reset cursor
+    file_storage.seek(0) # Reset file pointer after reading
     mime = magic.from_buffer(header, mime=True)
     allowed = ['text/plain', 'application/pdf', 'image/png', 'image/jpeg']
     return mime in allowed
@@ -33,15 +33,15 @@ def upload(current_user):
     
     filename = secure_filename(file.filename)
 
-    # --- NEW CHECK: PREVENT DUPLICATES ---
+    # --- PREVENT DUPLICATES ---
     existing_file = File.query.filter_by(user_id=current_user.id, original_filename=filename).first()
     if existing_file:
-        # 1. Remove the old physical file from storage
+        # Remove the old physical file from storage
         old_path = os.path.join(UPLOAD_FOLDER, existing_file.storage_name)
         if os.path.exists(old_path):
             os.remove(old_path)
 
-        # 2. Delete the old database record
+        # Delete the old database record
         db.session.delete(existing_file)
         db.session.commit()
 
@@ -51,14 +51,14 @@ def upload(current_user):
     storage_name = f"{file_uuid}{file_ext}"
     
     # Encrypt
-    # 1. Generate a 16-byte nonce (CTR typically uses 16 bytes)
+    # Generate a 16-byte nonce (AES-CTR typically uses 16 bytes)
     nonce = os.urandom(16)
 
-    # 2. Set up the CTR engine
+    # Set up of CTR engine
     cipher = get_ctr_cipher(nonce)
     encryptor = cipher.encryptor()
 
-    # 3. Encrypt and store (Nonce + Ciphertext)
+    # Encrypt and store (Nonce + Ciphertext)
     file_data = file.read()
     encrypted_data = nonce + encryptor.update(file_data) + encryptor.finalize()
 
@@ -99,19 +99,19 @@ def download(current_user):
         return jsonify({'message': 'Missing'}), 404
 
     # Decrypt
-    # 1. Read the raw data from the storage
+    # Read the raw data from the storage
     with open(path, 'rb') as f:
         raw_data = f.read()
 
-    # 1. Extract the 16-byte nonce
+    # Extract the 16-byte nonce
     nonce = raw_data[:16]
     ciphertext = raw_data[16:]
 
-    # 2. Set up the CTR engine
+    # Set up the CTR engine
     cipher = get_ctr_cipher(nonce)
     decryptor = cipher.decryptor()
 
-    # 3. Decrypt
+    # Decrypt
     decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
 
     log_action(current_user.id, "DOWNLOAD", filename)

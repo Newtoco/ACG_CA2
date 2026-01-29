@@ -42,7 +42,7 @@ def generate_everything():
         critical=False,
     ).sign(key, hashes.SHA256())
 
-    # --- 3. Write 'key.pem' and 'cert.pem' to disk (Transit Security) ---
+    # --- Write 'key.pem' and 'cert.pem' (Transit Security) ---
     with open("key.pem", "wb") as f:
         f.write(key.private_bytes(
             encoding=serialization.Encoding.PEM,
@@ -53,8 +53,7 @@ def generate_everything():
     with open("cert.pem", "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
-    # --- 4. NEW: Generate AES-256 Master Key (At-Rest Security) ---
-    # This generates exactly 32 raw bytes to fix your ValueError
+    # --- Generate AES-256 Master Key for file encryption (Security at rest) ---
     with open("file_key.key", "wb") as f:
         f.write(os.urandom(32))
 

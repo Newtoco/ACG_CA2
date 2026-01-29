@@ -6,7 +6,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-    # Stores the secret key for Google/Microsoft Authenticator
+    # Stores the secret key for Authenticators
     totp_secret = db.Column(db.String(32), nullable=True)
 
     # --- Brute Force Protection ---

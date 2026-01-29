@@ -8,22 +8,21 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 app = Flask(__name__)
 
 # 2. Basic Configuration
-# SECURITY WARNING: Change this key in a production environment
+#Change Secret key in a production environment
 app.config['SECRET_KEY'] = 'super-secret-key-change-in-prod'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 3. Database Configuration
-# FIX: We must set a default URI to satisfy Flask-SQLAlchemy, even if we use binds.
+# set a default URI to satisfy Flask-SQLAlchemy, even if we use binds.
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 
-# Define the two separate databases as requested
+# Define the two separate databases, one for user data and another for audit logs
 app.config['SQLALCHEMY_BINDS'] = {
     'users': 'sqlite:///users.db',
     'audit': 'sqlite:///audit.db'
 }
 
-# 4. Encryption Key Setup
-
+# Encryption Key Setup for ensuring security at rest
 # Load the raw 32-byte key
 KEY_PATH = "file_key.key"
 if os.path.exists(KEY_PATH):
@@ -33,11 +32,11 @@ if os.path.exists(KEY_PATH):
 def get_ctr_cipher(nonce):
     return Cipher(algorithms.AES(FILE_ENCRYPTION_KEY), modes.CTR(nonce))
 
-# 5. File Storage Setup
+# File Storage Setup for secure file management
 UPLOAD_FOLDER = 'secure_vault_storage'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# 6. Initialize Extensions
+# Initialize Extensions
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)

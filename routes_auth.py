@@ -17,11 +17,11 @@ auth_bp = Blueprint('auth', __name__)
 def is_safe_input(input_str):
     """
     Prevents Injection Attacks by enforcing alphanumeric characters only.
-    Ref: Assignment Brief - 'Robustness'
+    for Robustness
     """
     if not input_str:
         return False
-    # Regex: Allow only a-z, A-Z, 0-9. No special chars (like ' OR 1=1).
+    # Regex: Allow only a-z, A-Z, 0-9. No special chars (like ' OR 1=1) to prevent SQL injection.
     return bool(re.match("^[a-zA-Z0-9]+$", input_str))
 
 # --- PASSWORD STRENGTH POLICY ---
@@ -64,7 +64,7 @@ def register():
     secret = pyotp.random_base32()
     
     try:
-        # 'failed_attempts' and 'locked_until' are required in models.py
+        # 'failed_attempts' and 'locked_until' are required in models.py to prevent brute force of credentials
         user = User(
             username=username, 
             password=hashed_pw, 
@@ -75,7 +75,7 @@ def register():
         db.session.add(user)
         db.session.commit()
         
-        # Generate QR Code for 2FA
+        # Generate QR Code for 2FA system
         totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name="SecureVault")
         img = qrcode.make(totp_uri)
         buf = io.BytesIO()
@@ -108,12 +108,12 @@ def login():
 
     # --- BRUTE FORCE PROTECTION ---
     if user:
-        # 1. Check if account is currently locked
+        # Check if account is currently locked
         if user.locked_until and user.locked_until > datetime.datetime.utcnow():
             remaining = (user.locked_until - datetime.datetime.utcnow()).seconds // 60
             return jsonify({'message': f'Account Locked. Try again in {remaining} minutes.'}), 403
 
-        # 2. Verify Password
+        # Verify Password
         if bcrypt.check_password_hash(user.password, password):
             # Success: Reset the counter
             user.failed_attempts = 0
