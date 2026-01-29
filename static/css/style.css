@@ -513,3 +513,9 @@ button.success:hover:not(:disabled) {
   border: 1px solid var(--border-color);
 }
 
+/* Target the header text in your log tables */
+.log-table th {
+    color: #000000 !important; /* Forces the text color to black */
+    font-weight: bold;
+    background-color: #f8f9fa;
+}
