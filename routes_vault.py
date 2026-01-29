@@ -25,7 +25,15 @@ def upload(current_user):
     with open(os.path.join(UPLOAD_FOLDER, storage_name), 'wb') as f:
         f.write(encrypted_data)
         
-    log_action(current_user.id, "UPLOAD", filename)
+    log_action(
+        user_id=current_user.id,
+        action="UPLOAD",
+        filename=filename,
+        username_entered=current_user.username,
+        success=True,
+        details="File uploaded successfully"
+    )
+
     return jsonify({'message': 'Uploaded'})
 
 @vault_bp.route('/list-files')
@@ -48,6 +56,15 @@ def download(current_user):
     with open(path, 'rb') as f:
         encrypted_data = f.read()
     decrypted_data = cipher_suite.decrypt(encrypted_data)
+    log_action(
+        user_id=current_user.id,
+        action="DOWNLOAD",
+        filename=filename,
+        username_entered=current_user.username,
+        success=True,
+        details="File downloaded successfully"
+    )
+
         
     from io import BytesIO
     return send_file(
@@ -64,6 +81,13 @@ def delete(current_user):
     
     if os.path.exists(path):
         os.remove(path)
-        log_action(current_user.id, "DELETE", filename)
+        log_action(
+            user_id=current_user.id,
+            action="DELETE",
+            filename=filename,
+            username_entered=current_user.username,
+            success=True,
+            details="File deleted successfully"
+        )
         return jsonify({'message': 'Deleted'})
     return jsonify({'message': 'Not Found'}), 404

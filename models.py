@@ -9,6 +9,20 @@ class User(db.Model):
     # Stores the secret key for Google/Microsoft Authenticator
     totp_secret = db.Column(db.String(32), nullable=True)
 
+    # --- Brute Force Protection ---
+    failed_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime, nullable=True)
+
+# --- File Storage System ---
+class File(db.Model):
+    __bind_key__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    original_filename = db.Column(db.String(200), nullable=False)
+    storage_name = db.Column(db.String(200), unique=True, nullable=False)
+    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+# ---Enhanced Audit Logs ---
 class AuditLog(db.Model):
     __bind_key__ = 'audit'
     id = db.Column(db.Integer, primary_key=True)
