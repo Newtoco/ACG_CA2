@@ -16,7 +16,7 @@ def dashboard(current_user):
 
 def validate_file_type(file_storage):
     header = file_storage.read(2048)
-    file_storage.seek(0) # CRITICAL: Reset cursor
+    file_storage.seek(0)
     mime = magic.from_buffer(header, mime=True)
     allowed = ['text/plain', 'application/pdf', 'image/png', 'image/jpeg']
     return mime in allowed
