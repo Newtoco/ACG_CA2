@@ -165,6 +165,7 @@ function renderDashboard(username) {
         <button onclick="deleteFile()" class="danger">
             <span style="font-size:1.1rem;">🗑</span> Delete Selected
         </button>
+        ${username === 'admin' ? `<button onclick="viewSystemLogs()" class="warning" style="margin-top:10px">🛡️ View Audit Logs</button>` : ''}
         <button onclick="handleLogout()" class="secondary" style="margin-top:20px">Log Out</button>
     `;
     loadFiles();
@@ -489,4 +490,162 @@ async function deleteFile() {
             }
         }
     );
+}
+
+async function viewSystemLogs() { // Completely new log viewer
+    const app = document.getElementById('app');
+    app.innerHTML = `
+        <style>
+            #app {
+                max-width: 95% !important;
+                width: 95% !important;
+            }
+            .log-table-container {
+                overflow-x: auto;
+                margin-top: 15px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            .log-table {
+                width: 100%;
+                border-collapse: collapse;
+                min-width: 600px;
+            }
+            .log-table th, .log-table td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid #eee;
+                vertical-align: top;
+                word-wrap: break-word;
+                max-width: 400px; /* Prevents overflow */
+            }
+            .log-table th { background-color: #f9f9f9; font-weight: 600; }
+            .log-table tr:hover { background-color: #000000; }
+        </style>
+        <h2>🛡️ System Audit Logs</h2>
+        
+        <div class="tabs">
+            <button class="tab-link active" onclick="openTab(event, 'AllActions')">User Activity</button>
+            <button class="tab-link" onclick="openTab(event, 'FailedLogins')">Failed Logins</button>
+        </div>
+
+        <div id="AllActions" class="tab-content" style="display:block;">
+            <h3>Filter Activity</h3>
+            <div class="filter-bar">
+                <input type="text" id="log-user-filter" placeholder="Filter by username...">
+                <select id="log-action-filter">
+                    <option value="">All Actions</option>
+                    <option value="LOGIN_SUCCESS">Successful Logins</option>
+                    <option value="UPLOAD">File Uploads</option>
+                    <option value="DOWNLOAD">File Downloads</option>
+                    <option value="DELETE">File Deletes</option>
+                </select>
+                <button onclick="fetchFilteredLogs()">Search</button>
+            </div>
+            <div id="all-logs-table" class="log-table-container"></div>
+        </div>
+
+        <div id="FailedLogins" class="tab-content">
+            <h3>Filter Failed Logins</h3>
+            <div class="filter-bar">
+                <input type="text" id="failed-log-user-filter" placeholder="Filter by username entered...">
+                <button onclick="fetchFailedLoginLogs()">Search</button>
+            </div>
+            <div id="failed-logs-table" class="log-table-container"></div>
+        </div>
+
+        <button onclick="renderDashboard('admin')" class="secondary" style="margin-top:20px;">Back to Dashboard</button>
+    `;
+
+    // Initial load
+    fetchFilteredLogs();
+    fetchFailedLoginLogs();
+}
+
+function openTab(evt, tabName) {
+    let i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tab-link");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+}
+
+async function fetchFilteredLogs() {
+    const container = document.getElementById('all-logs-table');
+    container.innerHTML = '<div class="spinner-large"></div>';
+
+    const username = document.getElementById('log-user-filter').value;
+    const action = document.getElementById('log-action-filter').value;
+    
+    const params = new URLSearchParams();
+    if (username) params.append('username', username);
+    if (action) params.append('action', action);
+
+    try {
+        const res = await fetch('/logs/all?' + params.toString());
+        if (!res.ok) throw new Error('Access Denied');
+        const logs = await res.json();
+        
+        const headers = ['Time', 'Action', 'User', 'Details', 'IP Address'];
+        const rowsHtml = logs.map(l => `
+            <tr>
+                <td>${new Date(l.timestamp).toLocaleString()}</td>
+                <td><strong>${l.action}</strong></td>
+                <td>${l.username_entered || (l.user_id ? 'ID: ' + l.user_id : 'System')}</td>
+                <td>${(l.filename ? `File: <strong>${l.filename}</strong>` : '')} ${l.details || ''}</td>
+                <td>${l.ip_address || 'N/A'}</td>
+            </tr>
+        `).join('');
+        
+        container.innerHTML = `
+            <table class="log-table">
+                <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                <tbody>${rowsHtml || '<tr><td colspan="5">No logs found for this filter.</td></tr>'}</tbody>
+            </table>
+        `;
+    } catch (e) {
+        showToast('Error', 'Could not fetch logs', 'error');
+        container.innerHTML = '<div class="empty-state">Error loading logs.</div>';
+    }
+}
+
+async function fetchFailedLoginLogs() {
+    const container = document.getElementById('failed-logs-table');
+    container.innerHTML = '<div class="spinner-large"></div>';
+    
+    const username = document.getElementById('failed-log-user-filter').value;
+    const params = new URLSearchParams();
+    if (username) params.append('username', username);
+
+    try {
+        const res = await fetch('/logs/failed-logins?' + params.toString());
+        if (!res.ok) throw new Error('Access Denied');
+        const logs = await res.json();
+        
+        const headers = ['Time', 'Username Entered', 'Details', 'IP Address'];
+        const rowsHtml = logs.map(l => `
+            <tr>
+                <td>${new Date(l.timestamp).toLocaleString()}</td>
+                <td>${l.username_entered || 'N/A'}</td>
+                <td>${l.details || ''}</td>
+                <td>${l.ip_address || 'N/A'}</td>
+            </tr>
+        `).join('');
+        
+        container.innerHTML = `
+            <table class="log-table">
+                <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                <tbody>${rowsHtml || '<tr><td colspan="4">No failed login logs found.</td></tr>'}</tbody>
+            </table>
+        `;
+    } catch (e) {
+        showToast('Error', 'Could not fetch failed logs', 'error');
+        container.innerHTML = '<div class="empty-state">Error loading logs.</div>';
+    }
 }
