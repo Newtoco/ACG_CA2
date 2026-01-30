@@ -111,7 +111,12 @@ def register():
     
     # Generate user keypair for non-repudiation
     from utils.crypto_utils import generate_user_keypair
+    from utils.key_encryption import encrypt_private_key
+    
     private_pem, public_pem = generate_user_keypair()
+    
+    # Encrypt private key with user's password
+    encrypted_key, salt = encrypt_private_key(private_pem, password)
     
     try:
         # 'failed_attempts' and 'locked_until' are required in models.py
@@ -121,7 +126,8 @@ def register():
             totp_secret=secret,
             failed_attempts=0, 
             locked_until=None,
-            private_key_pem=private_pem,
+            encrypted_private_key=base64.b64encode(encrypted_key).decode('utf-8'),
+            private_key_salt=base64.b64encode(salt).decode('utf-8'),
             public_key_pem=public_pem
         )
         db.session.add(user)
@@ -183,6 +189,13 @@ def login():
             user.failed_attempts = 0
             user.locked_until = None
             db.session.commit()
+            
+            # Store password temporarily for key decryption after 2FA
+            # This is only in memory during authentication flow
+            from flask import session
+            session['temp_password'] = password
+            session['temp_user_id'] = user.id
+            
             return jsonify({'otp_required': True, 'user_id': user.id})
         else:
             # Password Failure: Increment failed attempts counter
@@ -247,15 +260,40 @@ def verify_otp():
     # Verify TOTP
     totp = pyotp.TOTP(user.totp_secret)
     if totp.verify(input_code):
+        # Decrypt private key using password from login
+        from flask import session
+        from utils.key_encryption import decrypt_private_key
+        
+        password = session.get('temp_password')
+        if password and user.encrypted_private_key and user.private_key_salt:
+            try:
+                encrypted_key = base64.b64decode(user.encrypted_private_key)
+                salt = base64.b64decode(user.private_key_salt)
+                private_key_pem = decrypt_private_key(encrypted_key, salt, password)
+                
+                # Store decrypted key in server-side session (memory only)
+                session['private_key_pem'] = private_key_pem
+                session.permanent = False  # Session expires when browser closes
+            except Exception as e:
+                print(f"Key decryption failed: {e}")
+                # Fall back to plaintext key if exists (backward compatibility)
+                if user.private_key_pem:
+                    session['private_key_pem'] = user.private_key_pem
+        elif user.private_key_pem:
+            # Backward compatibility: use plaintext key if exists
+            session['private_key_pem'] = user.private_key_pem
+        
+        # Clear temporary password from session
+        session.pop('temp_password', None)
+        session.pop('temp_user_id', None)
+        
         token = jwt.encode({
             'user_id': user_id,
             'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
         }, 'super-secret-key-change-in-prod', algorithm="HS256")
         
         resp = make_response(jsonify({'message': 'Success'}))
-        resp.set_cookie('auth_token', token, httponly=True, secure=True, samesite='Strict') # Guarantees the cookie is never sent over unencrypted HTTP (prevents sniffing)
-        log_action(user_id, "LOGIN_SUCCESS")
-        resp.set_cookie('auth_token', token, httponly=True, secure=True)
+        resp.set_cookie('auth_token', token, httponly=True, secure=True, samesite='Strict')
         log_action(user_id, "LOGIN_SUCCESS", username_entered=user.username, success=True)
         return resp
     else:

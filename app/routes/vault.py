@@ -151,16 +151,18 @@ def upload(current_user):
     # Sign plaintext file data with user's private RSA key before encryption
     # This proves: (1) who uploaded the file, (2) when it was uploaded, (3) file integrity
     # Signature cannot be forged without access to user's private key
-    if not current_user.private_key_pem:
-        # Backward compatibility: Generate keys for users created before implementation
-        from utils.crypto_utils import generate_user_keypair
-        private_pem, public_pem = generate_user_keypair()
-        current_user.private_key_pem = private_pem
-        current_user.public_key_pem = public_pem
-        db.session.commit()
     
+    from flask import session
     from utils.crypto_utils import load_user_private_key
-    user_private_key = load_user_private_key(current_user.private_key_pem)
+    
+    # Get decrypted private key from session (decrypted during login)
+    private_key_pem = session.get('private_key_pem')
+    
+    if not private_key_pem:
+        # Session expired or user needs to re-login
+        return jsonify({'message': 'Session expired. Please login again to decrypt your private key.'}), 401
+    
+    user_private_key = load_user_private_key(private_key_pem)
     
     signature = user_private_key.sign(
         file_data,

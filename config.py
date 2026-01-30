@@ -35,6 +35,16 @@ app.config['SQLALCHEMY_BINDS'] = {
     'audit': 'sqlite:///audit.db'
 }
 
+# Server-side session storage for decrypted private keys
+# Keys only exist in memory during active session
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
+
+from flask_session import Session
+Session(app)
+
 # Encryption Key Setup
 KEY_PATH = os.path.join("certs", "file_key.key")
 if os.path.exists(KEY_PATH):
