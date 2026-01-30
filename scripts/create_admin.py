@@ -1,5 +1,10 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from config import app, db, bcrypt
 from models import User
+from utils.crypto_utils import generate_user_keypair
 import pyotp
 import qrcode
 
@@ -26,15 +31,28 @@ def create_admin():
         # Generate security secrets
         hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
         totp_secret = pyotp.random_base32()
+        
+        # Generate RSA keypair for non-repudiation
+        print("[*] Generating RSA keypair for admin...")
+        private_pem, public_pem = generate_user_keypair()
 
         # Create and save user
-        new_admin = User(username=username, password=hashed_pw, totp_secret=totp_secret)
+        new_admin = User(
+            username=username, 
+            password=hashed_pw, 
+            totp_secret=totp_secret,
+            private_key_pem=private_pem,
+            public_key_pem=public_pem,
+            failed_attempts=0,
+            locked_until=None
+        )
         db.session.add(new_admin)
         db.session.commit()
 
         print(f"[+] Admin user created successfully!")
         print(f"[+] Username: {username}")
         print(f"[+] Password: {password}")
+        print(f"[+] RSA Keypair: Generated ✓")
         print("-" * 40)
         
         # Generate and display QR code in the terminal

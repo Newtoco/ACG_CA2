@@ -16,7 +16,7 @@ app.config['SQLALCHEMY_BINDS'] = {
 }
 
 # Encryption Key Setup
-KEY_PATH = "file_key.key"
+KEY_PATH = os.path.join("certs", "file_key.key")
 if os.path.exists(KEY_PATH):
     with open(KEY_PATH, "rb") as f:
         FILE_ENCRYPTION_KEY = f.read()

@@ -5,6 +5,10 @@ Checks:
 2. Uploaded files have signatures
 3. Signatures can be verified
 """
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from config import app, db
 from models import User, File
 from utils.crypto_utils import load_user_private_key, load_user_public_key

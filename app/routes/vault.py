@@ -95,6 +95,11 @@ def upload(current_user):
     )
     # Convert signature to string for DB storage
     signature_b64 = base64.b64encode(signature).decode('utf-8')
+    
+    # Debug output for upload signature
+    print(f"✓ File signed by user {current_user.username}")
+    print(f"  Signature (full): {signature_b64}")
+    print(f"  File: {filename} ({len(file_data)} bytes)")
 
     # Encrypt
     # 1. Generate a 12-byte nonce (Standard for GCM)
@@ -191,7 +196,10 @@ def download(current_user):
                 padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
                 hashes.SHA256()
             )
-            print(f"Non-repudiation Verified: File uploaded by user {uploader.username}")
+            # Debug output for verification
+            sig_full = base64.b64encode(signature).decode('utf-8')
+            print(f"✓ Non-repudiation Verified: File uploaded by user {uploader.username}")
+            print(f"  Signature (full): {sig_full}")
         except Exception:
             return jsonify({'message': 'Non-repudiation check failed: Signature mismatch'}), 400
 

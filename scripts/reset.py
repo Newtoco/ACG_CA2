@@ -77,14 +77,14 @@ def main():
     print("=" * 60)
     print("\nThis will delete all generated files and reset the application.\n")
     
-    # Get the current directory
-    base_dir = Path(__file__).parent
+    # Get the project root directory (parent of scripts)
+    base_dir = Path(__file__).parent.parent
     
     # Files to delete
     print("1. Deleting certificate and key files...")
-    delete_file(base_dir / "key.pem")
-    delete_file(base_dir / "cert.pem")
-    delete_file(base_dir / "file_key.key")
+    delete_file(base_dir / "certs" / "key.pem")
+    delete_file(base_dir / "certs" / "cert.pem")
+    delete_file(base_dir / "certs" / "file_key.key")
     
     # Clear vault storage
     print("\n2. Clearing secure vault storage...")
@@ -101,8 +101,8 @@ def main():
     print("\n" + "=" * 60)
     print("RESET COMPLETE")
     print("=" * 60)
-    print("\n[!] You can now run generate_cert.py to regenerate certificates.")
-    print("[!] Then run create_admin.py to create a new admin user.")
+    print("\n[!] You can now run: python scripts/generate_cert.py")
+    print("[!] Then run scripts/create_admin.py to create a new admin user.")
     print("[!] Finally, start the application with python main.py")
 
 if __name__ == "__main__":

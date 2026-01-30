@@ -1,4 +1,5 @@
 # Security-sensitive files - NEVER commit these!
+certs/
 cert.pem
 key.pem
 file_key.key
@@ -23,6 +24,11 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
 
 # Virtual Environment
 venv/
