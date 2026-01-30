@@ -372,8 +372,15 @@ async function handleRegister() {
 
 async function handleLogout() { 
     try {
-        await fetch('/logout', {method: 'POST'});
-        showToast('Logged Out', 'See you next time!', 'success', 1500);
+        const response = await fetch('/logout', {method: 'POST'});
+        const data = await response.json();
+        
+        // Show detailed message about session clearing
+        const message = data.private_key_cleared 
+            ? 'Session key cleared from memory' 
+            : 'See you next time!';
+        
+        showToast('Logged Out', message, 'success', 1500);
         setTimeout(() => window.location.href = '/', 1500);
     } catch(e) {
         window.location.href = '/';

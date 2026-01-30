@@ -147,13 +147,17 @@ def upload(current_user):
 
     file_data = file.read()
 
-    # SECURITY: Digital Signature for Non-Repudiation
-    # Sign plaintext file data with user's private RSA key before encryption
-    # This proves: (1) who uploaded the file, (2) when it was uploaded, (3) file integrity
+    # SECURITY: Digital Signature for Non-Repudiation with Receipt Payload
+    # Instead of signing raw file bytes, sign a structured receipt that proves:
+    # (1) WHO uploaded: user_id
+    # (2) WHAT was uploaded: original_filename + SHA256(file_data)
+    # (3) WHEN it was uploaded: upload_timestamp
+    # This provides stronger, more defensible non-repudiation proof
     # Signature cannot be forged without access to user's private key
     
     from flask import session
     from utils.crypto_utils import load_user_private_key
+    import datetime
     
     # Get decrypted private key from session (decrypted during login)
     private_key_pem = session.get('private_key_pem')
@@ -164,8 +168,27 @@ def upload(current_user):
     
     user_private_key = load_user_private_key(private_key_pem)
     
+    # Generate upload timestamp (will be stored in DB)
+    upload_timestamp = datetime.datetime.utcnow()
+    
+    # Compute SHA256 hash of file contents
+    from cryptography.hazmat.primitives import hashes as crypto_hashes
+    digest = crypto_hashes.Hash(crypto_hashes.SHA256())
+    digest.update(file_data)
+    file_hash = digest.finalize()
+    
+    # Build receipt payload: user_id + filename + timestamp + file_hash
+    # This creates an unambiguous record of the upload transaction
+    receipt_payload = (
+        f"user_id:{current_user.id}|"
+        f"filename:{filename}|"
+        f"timestamp:{upload_timestamp.isoformat()}|"
+        f"sha256:{file_hash.hex()}"
+    ).encode('utf-8')
+    
+    # Sign the receipt payload (not raw file bytes)
     signature = user_private_key.sign(
-        file_data,
+        receipt_payload,
         padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
         hashes.SHA256()
     )
@@ -173,7 +196,8 @@ def upload(current_user):
     signature_b64 = base64.b64encode(signature).decode('utf-8')
     
     # Debug output for upload signature
-    print(f"File signed by user {current_user.username}")
+    print(f"File receipt signed by user {current_user.username}")
+    print(f"  Receipt payload: {receipt_payload.decode('utf-8')}")
     print(f"  Signature (full): {signature_b64}")
     print(f"  File: {filename} ({len(file_data)} bytes)")
 
@@ -210,6 +234,7 @@ def upload(current_user):
         user_id=current_user.id,
         original_filename=filename,
         storage_name=storage_name,
+        upload_date=upload_timestamp,
         signature=signature_b64
     )
     db.session.add(file_record)
@@ -267,8 +292,8 @@ def download(current_user):
         return jsonify({'message': 'Integrity check failed'}), 400
 
     # SECURITY: Digital Signature Verification (Non-Repudiation)
-    # Verify file was actually uploaded by claimed user
-    # Proves authenticity and integrity of the original upload
+    # Verify receipt payload signature to prove upload transaction details
+    # Receipt includes: who, what, when, and content hash
     if file_record.signature:
         # Get the uploader's public key (from the user who uploaded it)
         from models import User
@@ -282,19 +307,35 @@ def download(current_user):
         user_public_key = load_user_public_key(uploader.public_key_pem)
         signature = base64.b64decode(file_record.signature)
         
-        # Verify signature matches the decrypted file data
-        # This proves: (1) File uploaded by claimed user, (2) File not modified since upload
+        # Reconstruct the receipt payload that was signed during upload
+        # Must match exactly: user_id + filename + timestamp + SHA256(file)
+        from cryptography.hazmat.primitives import hashes as crypto_hashes
+        digest = crypto_hashes.Hash(crypto_hashes.SHA256())
+        digest.update(decrypted_data)
+        file_hash = digest.finalize()
+        
+        receipt_payload = (
+            f"user_id:{file_record.user_id}|"
+            f"filename:{file_record.original_filename}|"
+            f"timestamp:{file_record.upload_date.isoformat()}|"
+            f"sha256:{file_hash.hex()}"
+        ).encode('utf-8')
+        
+        # Verify signature matches the receipt payload
+        # This proves: (1) File uploaded by claimed user, (2) Original filename matches
+        # (3) Upload timestamp hasn't been altered, (4) File contents match original hash
         # Uses RSA-PSS signature scheme with SHA-256
         try:
             user_public_key.verify(
                 signature,
-                decrypted_data,  # Verify against plaintext (signature was created before encryption)
+                receipt_payload,  # Verify against receipt (not raw file bytes)
                 padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
                 hashes.SHA256()
             )
             # Signature verification successful - non-repudiation confirmed
             sig_full = base64.b64encode(signature).decode('utf-8')
-            print(f"Non-repudiation Verified: File uploaded by user {uploader.username}")
+            print(f"Non-repudiation Verified: Receipt confirmed for user {uploader.username}")
+            print(f"  Receipt payload: {receipt_payload.decode('utf-8')}")
             print(f"  Signature (full): {sig_full}")
         except Exception:
             # Signature verification failed - file may be tampered or wrong user

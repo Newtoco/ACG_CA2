@@ -353,6 +353,13 @@ def logout():
             # token invalid/expired - still proceed to clear cookie
             username = None
 
+    # SECURITY: Clear server-side session data
+    # Removes decrypted private key from memory on logout
+    # Prevents session reuse if JWT token is somehow stolen
+    from flask import session
+    had_private_key = 'private_key_pem' in session
+    session.clear()
+
     # log logout
     if username:
         log_action(
@@ -361,6 +368,16 @@ def logout():
             username_entered=username,
             success=True
         )
-    resp = make_response(jsonify({'message': 'Logged out'}))
+    
+    # Provide detailed feedback about session clearing
+    message = 'Logged out successfully'
+    if had_private_key:
+        message += ' - Session key cleared from memory'
+    
+    resp = make_response(jsonify({
+        'message': message,
+        'session_cleared': True,
+        'private_key_cleared': had_private_key
+    }))
     resp.set_cookie('auth_token', '', expires=0)
     return resp
