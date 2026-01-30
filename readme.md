@@ -50,6 +50,7 @@ ACG_CA2/
 │   ├── cert.pem           # SSL certificate (generated)
 │   ├── key.pem            # SSL private key (generated)
 │   └── file_key.key       # Master file encryption key (generated)
+├── flask_session/          # Server-side session files (runtime artifact, git-ignored)
 ├── instance/               # Database files (auto-generated, git-ignored)
 │   ├── users.db           # User credentials, keys, and file metadata
 │   └── audit.db           # Immutable audit logs
@@ -562,7 +563,11 @@ This application is configured for development and learning. For production depl
 - Cause: Missing Python dependencies
 - Solution: Run `python -m pip install -r requirements.txt`
 
-**Database errors or table not found:**
+**File encryption key not found error:**
+- Cause: Missing `certs/file_key.key` (encryption key not generated)
+- Solution: Run `python scripts/generate_cert.py` to generate required certificates and keys. The application will provide a clear error message with instructions if this key is missing.
+
+**Database errors or table not found:****
 - Cause: Database not initialized or corrupted
 - Solution: Delete `instance/` folder and restart application. Databases will be recreated. Note: This deletes all user data.
 
@@ -599,7 +604,32 @@ This application is configured for development and learning. For production depl
 For more detailed information, see:
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick command reference for common tasks
 - [scripts/README.md](scripts/README.md) - Administrative scripts documentation
-- [ENCRYPTED_KEYS_IMPLEMENTATION.md](ENCRYPTED_KEYS_IMPLEMENTATION.md) - Complete guide to encrypted private key storage implementation
+
+## Implementation Summary
+
+This secure file vault system implements enterprise-grade security features:
+
+**Core Security Implementations:**
+1. **Encrypted Private Key Storage** - User private keys encrypted with PBKDF2 (600k iterations) + AES-256-GCM, never stored in plaintext
+2. **Receipt-based Digital Signatures** - Files signed with structured receipts (user_id + filename + timestamp + SHA256) for stronger non-repudiation
+3. **Server-side Session Management** - Decrypted keys stored in filesystem-based sessions, automatically cleared on logout
+4. **Defense in Depth** - Multiple security layers from network (TLS) to data (AES-256-GCM encryption)
+
+**Key Features:**
+- Dual-factor authentication (password + TOTP)
+- File encryption at rest with AES-256-GCM
+- Digital signatures for non-repudiation
+- Comprehensive audit logging
+- Account lockout protection
+- Session timeout (30 minutes)
+- User isolation and access control
+
+**Production Readiness:**
+- Clear error messages for missing dependencies
+- Robust startup validation
+- Comprehensive troubleshooting documentation
+- Administrative scripts for maintenance
+- Clean codebase with no redundant files
 
 ## License and Attribution
 
