@@ -50,6 +50,18 @@ KEY_PATH = os.path.join("certs", "file_key.key")
 if os.path.exists(KEY_PATH):
     with open(KEY_PATH, "rb") as f:
         FILE_ENCRYPTION_KEY = f.read()
+else:
+    raise FileNotFoundError(
+        f"\n\n"
+        f"ERROR: File encryption key not found at '{KEY_PATH}'\n"
+        f"\n"
+        f"This key is required to encrypt/decrypt files in the vault.\n"
+        f"\n"
+        f"TO FIX: Run the certificate generation script:\n"
+        f"   python scripts/generate_cert.py\n"
+        f"\n"
+        f"This will create the required certificates and encryption keys.\n"
+    )
 
 # GCM Cipher Helper
 def get_gcm_cipher(nonce, tag=None):

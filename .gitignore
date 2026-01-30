@@ -15,6 +15,9 @@ instance/
 # Uploaded encrypted files
 secure_vault_storage/
 
+# Server-side session files (runtime artifacts)
+flask_session/
+
 # Audit backups
 backups/
 
