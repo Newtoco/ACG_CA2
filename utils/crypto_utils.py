@@ -2,7 +2,6 @@ import os
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
-from Crypto.Random import get_random_bytes
 
 def load_private_key(path):
     with open(path, "rb") as key_file:
@@ -82,3 +81,39 @@ def verify_signature(data, signature, sender_public_key):
         return True
     except Exception:
         return False
+
+# --- USER KEY GENERATION FOR NON-REPUDIATION ---
+
+def generate_user_keypair():
+    """Generates a new RSA keypair for a user (2048-bit)"""
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+    public_key = private_key.public_key()
+    
+    # Serialize to PEM format
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()  # Store unencrypted (or encrypt with user password)
+    ).decode('utf-8')
+    
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode('utf-8')
+    
+    return private_pem, public_pem
+
+def load_user_private_key(pem_string):
+    """Load a user's private key from PEM string"""
+    return serialization.load_pem_private_key(
+        pem_string.encode('utf-8'),
+        password=None
+    )
+
+def load_user_public_key(pem_string):
+    """Load a user's public key from PEM string"""
+    return serialization.load_pem_public_key(pem_string.encode('utf-8'))

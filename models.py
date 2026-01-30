@@ -9,6 +9,12 @@ class User(db.Model):
     # Stores the secret key for Authenticators
     totp_secret = db.Column(db.String(32), nullable=True)
 
+    # --- Non-Repudiation: User's RSA Keys ---
+    # Store user's private key (encrypted with their password in production)
+    private_key_pem = db.Column(db.Text, nullable=True)
+    # Store user's public key
+    public_key_pem = db.Column(db.Text, nullable=True)
+
     # --- Brute Force Protection ---
     failed_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime, nullable=True)

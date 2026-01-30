@@ -8,7 +8,7 @@ import base64
 from flask import Blueprint, request, jsonify, make_response, render_template, current_app
 from config import db, bcrypt
 from models import User
-from utils import log_action
+from auth_utils import log_action
 
 
 auth_bp = Blueprint('auth', __name__)
@@ -70,6 +70,10 @@ def register():
     hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
     secret = pyotp.random_base32()
     
+    # --- NON-REPUDIATION: Generate user keypair ---
+    from utils.crypto_utils import generate_user_keypair
+    private_pem, public_pem = generate_user_keypair()
+    
     try:
         # 'failed_attempts' and 'locked_until' are required in models.py
         user = User(
@@ -77,7 +81,9 @@ def register():
             password=hashed_pw, 
             totp_secret=secret,
             failed_attempts=0, 
-            locked_until=None
+            locked_until=None,
+            private_key_pem=private_pem,
+            public_key_pem=public_pem
         )
         db.session.add(user)
         db.session.commit()

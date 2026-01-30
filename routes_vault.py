@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, send_file, render_template
 from werkzeug.utils import secure_filename
 from config import UPLOAD_FOLDER, get_gcm_cipher, db
 from models import File
-from utils import token_required, log_action
+from auth_utils import token_required, log_action
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
@@ -75,9 +75,20 @@ def upload(current_user):
 
     file_data = file.read()
 
-    # --- NON-REPUDIATION: SIGNING ---
-    private_key = get_private_key()
-    signature = private_key.sign(
+    # --- NON-REPUDIATION: SIGNING WITH USER'S PRIVATE KEY ---
+    # Use user's private key instead of server key for true non-repudiation
+    if not current_user.private_key_pem:
+        # Generate keys for user if they don't exist (backward compatibility)
+        from utils.crypto_utils import generate_user_keypair
+        private_pem, public_pem = generate_user_keypair()
+        current_user.private_key_pem = private_pem
+        current_user.public_key_pem = public_pem
+        db.session.commit()
+    
+    from utils.crypto_utils import load_user_private_key
+    user_private_key = load_user_private_key(current_user.private_key_pem)
+    
+    signature = user_private_key.sign(
         file_data,
         padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
         hashes.SHA256()
@@ -160,18 +171,27 @@ def download(current_user):
         log_action(current_user.id, "TAMPER_DETECTED", filename)
         return jsonify({'message': 'Integrity check failed'}), 400
 
-    # --- NON-REPUDIATION: VERIFY SIGNATURE ---
+    # --- NON-REPUDIATION: VERIFY SIGNATURE WITH USER'S PUBLIC KEY ---
     if file_record.signature:
-        public_key = get_public_key()
+        # Get the uploader's public key (from the user who uploaded it)
+        from models import User
+        uploader = User.query.get(file_record.user_id)
+        
+        if not uploader or not uploader.public_key_pem:
+            return jsonify({'message': 'Non-repudiation check failed: User key not found'}), 400
+        
+        from utils.crypto_utils import load_user_public_key
+        user_public_key = load_user_public_key(uploader.public_key_pem)
         signature = base64.b64decode(file_record.signature)
+        
         try:
-            public_key.verify(
+            user_public_key.verify(
                 signature,
                 decrypted_data,
                 padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
                 hashes.SHA256()
             )
-            print("Non-repudiation Verified")
+            print(f"Non-repudiation Verified: File uploaded by user {uploader.username}")
         except Exception:
             return jsonify({'message': 'Non-repudiation check failed: Signature mismatch'}), 400
 

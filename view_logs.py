@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from utils import token_required
+from auth_utils import token_required
 from models import AuditLog, User
 
 view_logs_bp = Blueprint("view_logs", __name__)
