@@ -16,10 +16,13 @@ A secure web-based file storage application built with Python and Flask. This sy
 **Encryption and Key Management:**
 - File encryption at rest using AES-256-GCM authenticated encryption
 - Private key encryption using PBKDF2-HMAC-SHA256 (600,000 iterations) and AES-256-GCM
+- User private keys encrypted with individual passwords (never stored in plaintext)
+- Decrypted keys stored in server-side session memory only (session-scoped)
 - TLS/SSL encryption for data in transit
 - RSA-2048 keypairs for each user (digital signatures)
 - Separate encryption keys for files and user private keys
 - Password-based key derivation for secure private key storage
+- Defense against database breach attacks
 
 **Non-Repudiation and Audit:**
 - Digital signatures on all uploaded files using RSA-PSS with SHA-256
@@ -270,10 +273,14 @@ After 5 failed attempts, your account will be locked for 15 minutes.
 
 **Private Key Encryption:**
 - Key derivation: PBKDF2-HMAC-SHA256 with 600,000 iterations (OWASP 2023 recommendation)
-- Encryption: AES-256-GCM
-- Random 16-byte salt per user
-- Private keys encrypted with user passwords
+- Encryption: AES-256-GCM with authenticated encryption
+- Random 16-byte salt per user (unique per key)
+- Private keys encrypted with user passwords before database storage
+- Keys never stored in plaintext in database
 - Nonce and authentication tag included for integrity
+- Decrypted only during login and stored in server-side session
+- Automatic session cleanup on logout or timeout
+- Resistance to database breach attacks
 
 **Digital Signatures:**
 - Algorithm: RSA-PSS with SHA-256
@@ -321,7 +328,10 @@ Windows:
 - Storage: HTTPOnly, Secure cookies
 - 30-minute expiry with automatic timeout
 - Server-side session storage using Flask-Session
-- Decrypted private keys stored in session (memory only)
+- Decrypted private keys stored in session memory only
+- Keys automatically cleared on session expiry
+- Session data stored in filesystem (not in cookies)
+- Enhanced security against token theft
 
 **Account Protection:**
 - Failed login tracking per user
@@ -336,10 +346,13 @@ The system uses two separate SQLite databases for security isolation:
 **users.db (User Database):**
 - User credentials (username, bcrypt password hash)
 - TOTP secrets (encrypted)
-- RSA keypairs (public keys plaintext, private keys encrypted)
-- Private key salts for PBKDF2 derivation
+- RSA keypairs (public keys plaintext, private keys encrypted with AES-256-GCM)
+- Private key encryption salts for PBKDF2 derivation
 - File metadata (original names, storage UUIDs, upload times)
+- Digital signatures for uploaded files
 - Failed login attempts and account status
+
+SECURITY NOTE: Private keys are NEVER stored in plaintext. They are encrypted with the user's password using PBKDF2 + AES-256-GCM. Even if the database is compromised, private keys remain secure.
 
 **audit.db (Audit Log Database):**
 - Immutable append-only log
@@ -357,9 +370,40 @@ The system implements multiple security layers:
 2. Application layer: JWT session tokens, CSRF protection
 3. Authentication layer: Dual-factor (password + TOTP)
 4. Authorization layer: User isolation, permission checks
-5. Data layer: Encrypted storage, database separation
+5. Data layer: Encrypted storage, database separation, encrypted private keys
 6. Audit layer: Comprehensive logging, immutable records
-7. Key management: Encrypted private keys, secure key derivation
+7. Key management: Password-encrypted private keys, secure key derivation (PBKDF2)
+8. Session security: Server-side storage, automatic key cleanup
+
+### Private Key Security Flow
+
+**Registration:**
+```
+User Password → PBKDF2 (600k iterations) → Encryption Key
+RSA Private Key → AES-256-GCM Encrypt → Encrypted Key → Database
+Public Key → Database (plaintext, not sensitive)
+```
+
+**Login:**
+```
+User Password + Salt (from DB) → PBKDF2 → Encryption Key
+Encrypted Private Key (from DB) → AES-256-GCM Decrypt → Private Key
+Private Key → Server-side Session (memory only, 30 min expiry)
+```
+
+**File Upload:**
+```
+Private Key (from session) → RSA Sign File → Digital Signature
+File Data → AES-256-GCM Encrypt → Encrypted File → Storage
+Signature → Database
+```
+
+**Session Expiry:**
+```
+30 minutes timeout OR user logout → Session cleared
+Private Key → Automatically deleted from memory
+User must re-login to decrypt key again
+```
 
 ## Configuration
 
@@ -435,6 +479,16 @@ Install all dependencies:
 ```bash
 python -m pip install -r requirements.txt
 ```
+
+**Key Dependencies:**
+- Flask: Web framework
+- Flask-SQLAlchemy: Database ORM
+- Flask-Bcrypt: Password hashing
+- Flask-Session: Server-side session management for encrypted key storage
+- cryptography: AES-256-GCM encryption and RSA key operations
+- PyJWT: JWT token management
+- pyotp: TOTP 2FA implementation
+- qrcode: QR code generation for 2FA setup
 
 ## Production Deployment Checklist
 
@@ -528,15 +582,24 @@ This application is configured for development and learning. For production depl
 - Cause: Wrong password or corrupted encrypted key
 - Solution: Cannot recover without correct password. User must regenerate keypair (loses ability to verify old signatures).
 
+**Session expired errors (401 Unauthorized):**
+- Cause: Server-side session expired (30-minute timeout) or server restart cleared session data
+- Solution: Log out and log back in. Private keys are decrypted fresh on each login.
+
+**Private key not found in session:**
+- Cause: Session cleared due to timeout, logout, or server restart
+- Solution: Log in again to decrypt and load private key into session memory.
+
 **Permission denied errors:**
 - Cause: Insufficient file system permissions
-- Solution: Run with appropriate permissions, or adjust file permissions on `instance/`, `certs/`, and `secure_vault_storage/` directories.
+- Solution: Run with appropriate permissions, or adjust file permissions on `instance/`, `certs/`, `flask_session/`, and `secure_vault_storage/` directories.
 
 ## Additional Documentation
 
 For more detailed information, see:
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick command reference for common tasks
 - [scripts/README.md](scripts/README.md) - Administrative scripts documentation
+- [ENCRYPTED_KEYS_IMPLEMENTATION.md](ENCRYPTED_KEYS_IMPLEMENTATION.md) - Complete guide to encrypted private key storage implementation
 
 ## License and Attribution
 
