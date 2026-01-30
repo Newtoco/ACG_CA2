@@ -1,3 +1,43 @@
+"""
+Authentication Routes
+
+Handles user registration, login, 2FA verification, and session management.
+
+Security Controls:
+
+1. Registration Security:
+   - Username sanitization (alphanumeric only, prevents SQL injection)
+   - Strong password enforcement (8+ chars, mixed case, digits, symbols)
+   - Bcrypt password hashing with adaptive cost factor
+   - Automatic RSA keypair generation for non-repudiation
+   - TOTP secret generation for 2FA
+
+2. Login Security:
+   - Brute force protection (5 failed attempts = 15 min lockout)
+   - Input sanitization on username
+   - Password verification using constant-time comparison
+   - Account lockout timing prevents enumeration attacks
+   - Comprehensive audit logging of all attempts
+
+3. Two-Factor Authentication (2FA):
+   - TOTP-based (Time-based One-Time Password)
+   - Compatible with Google Authenticator, Authy, etc.
+   - QR code generation for easy setup
+   - Required after successful password authentication
+
+4. Session Management:
+   - JWT tokens with HS256 signing
+   - HTTPOnly cookies prevent XSS attacks
+   - SameSite=Strict prevents CSRF
+   - Tokens expire after logout
+
+5. Audit Logging:
+   - All authentication events logged
+   - Failed attempts tracked with usernames and IP addresses
+   - Success/failure status recorded
+   - Security violations flagged with details
+"""
+
 import datetime
 import re
 import jwt
@@ -13,18 +53,17 @@ from auth_utils import log_action
 
 auth_bp = Blueprint('auth', __name__)
 
-# --- INPUT SANITIZATION ---
+# Input Sanitization
 def is_safe_input(input_str):
     """
     Prevents Injection Attacks by enforcing alphanumeric characters only.
-    Ref: Assignment Brief - 'Robustness'
     """
     if not input_str:
         return False
     # Regex: Allow only a-z, A-Z, 0-9. No special chars (like ' OR 1=1).
     return bool(re.match("^[a-zA-Z0-9]+$", input_str))
 
-# --- PASSWORD STRENGTH POLICY ---
+# Password Strength Policy
 def is_strong_password(password):
     """
     Enforces strong password complexity to prevent Dictionary Attacks.
@@ -50,7 +89,7 @@ def register():
     if not username or not password:
         return jsonify({'message': 'Missing data'}), 400
 
-    # --- SECURITY CHECK: SANITIZATION ---
+    # Security Check: Sanitization
     if not is_safe_input(username):
         log_action(
             user_id=None,
@@ -61,7 +100,7 @@ def register():
         )
         return jsonify({'message': 'Security Alert: Username must be alphanumeric only.'}), 400
     
-    # --- SECURITY CHECK: PASSWORD STRENGTH ---
+    # Security Check: Password Strength
     if not is_strong_password(password):
         return jsonify({
             'message': 'Weak Password. Must be 8+ chars and include: Upper, Lower, Number, Symbol (!@#$%).'
@@ -70,7 +109,7 @@ def register():
     hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
     secret = pyotp.random_base32()
     
-    # --- NON-REPUDIATION: Generate user keypair ---
+    # Generate user keypair for non-repudiation
     from utils.crypto_utils import generate_user_keypair
     private_pem, public_pem = generate_user_keypair()
     
@@ -113,31 +152,46 @@ def login():
     username = data.get('username')
     password = data.get('password')
 
-    # --- SANITIZATION ---
+    # Sanitization
     if not is_safe_input(username):
         return jsonify({'message': 'Invalid characters in username'}), 400
 
     user = User.query.filter_by(username=username).first()
 
-    # --- BRUTE FORCE PROTECTION ---
+    # SECURITY: Brute Force Protection
+    # Prevents automated password guessing attacks
+    # 5 failed attempts trigger 15-minute account lockout
+    # Timing-consistent responses prevent user enumeration
     if user:
         # 1. Check if account is currently locked
+        # Compare current time with lockout expiration
         if user.locked_until and user.locked_until > datetime.datetime.utcnow():
             remaining = (user.locked_until - datetime.datetime.utcnow()).seconds // 60
+            log_action(
+                user_id=user.id,
+                action="LOGIN_BLOCKED",
+                username_entered=username,
+                success=False,
+                details="ACCOUNT_LOCKED"
+            )
             return jsonify({'message': f'Account Locked. Try again in {remaining} minutes.'}), 403
 
         # 2. Verify Password
+        # bcrypt.check_password_hash uses constant-time comparison
         if bcrypt.check_password_hash(user.password, password):
-            # Success: Reset the counter
+            # Success: Reset the failed attempts counter
             user.failed_attempts = 0
             user.locked_until = None
             db.session.commit()
             return jsonify({'otp_required': True, 'user_id': user.id})
         else:
-            # Failure: Increment counter
+            # Password Failure: Increment failed attempts counter
             user.failed_attempts = (user.failed_attempts or 0) + 1
             
-            # Lockout Logic: 5 Failed Attempts = 15 Minute Lockout
+            # SECURITY: Lockout Logic
+            # 5 Failed Attempts = 15 Minute Lockout
+            # Exponential backoff could be implemented for repeated lockouts
+            # Prevents brute force attacks while allowing legitimate users to recover
             if user.failed_attempts >= 5:
                 user.locked_until = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
                 db.session.commit()

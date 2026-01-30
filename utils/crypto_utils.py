@@ -1,9 +1,44 @@
+"""
+Cryptographic Utilities
+
+Provides cryptographic operations for the secure file vault.
+
+Security Implementation:
+
+1. File Encryption (Hybrid Cryptography):
+   - AES-256-GCM for file encryption (authenticated encryption with AEAD)
+   - GCM provides both confidentiality and integrity protection
+   - Random nonces prevent deterministic encryption
+   - Authentication tags detect tampering
+
+2. Digital Signatures (Non-Repudiation):
+   - RSA-PSS signature scheme with SHA-256
+   - Each user has unique RSA-2048 keypair
+   - Private key signs uploaded files
+   - Public key verifies signatures on download
+   - Provides proof of authorship and integrity
+
+3. Key Management:
+   - User keypairs generated at registration
+   - Private keys stored in database (encrypted in production)
+   - Public keys used for signature verification
+   - Server keypairs (RSA-4096) for TLS/SSL
+
+Cryptographic Standards:
+- AES-256: NIST FIPS 197 approved
+- RSA-2048/4096: NIST FIPS 186-4 approved
+- SHA-256: NIST FIPS 180-4 approved
+- GCM mode: NIST SP 800-38D
+- PSS padding: PKCS#1 v2.1
+"""
+
 import os
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
 def load_private_key(path):
+    """Load RSA private key from PEM file"""
     with open(path, "rb") as key_file:
         return serialization.load_pem_private_key(key_file.read(), password=None)
 
@@ -11,21 +46,41 @@ def load_public_key(path):
     with open(path, "rb") as key_file:
         return serialization.load_pem_public_key(key_file.read())
 
-# --- HYBRID ENCRYPTION HELPERS ---
+# Hybrid Encryption Helpers
 
 def generate_aes_key():
-    """Generates a random 32-byte AES-256 key"""
+    """
+    Generates a cryptographically secure random 32-byte AES-256 key.
+    Uses os.urandom() which sources from system entropy pool.
+    """
     return os.urandom(32)
 
 def encrypt_file_aes(file_data, aes_key):
-    """Encrypts file data using AES-256-GCM (authenticated encryption)"""
+    """
+    Encrypts file data using AES-256-GCM (authenticated encryption with associated data).
+    
+    Security:
+    - AES-256: 256-bit key provides ~2^256 security strength
+    - GCM mode: Provides both confidentiality and authenticity
+    - Random 12-byte nonce: Prevents nonce reuse attacks
+    - Authentication tag: Included in ciphertext, verifies integrity
+    
+    Returns: nonce (12 bytes) + ciphertext + auth_tag (concatenated)
+    """
     aesgcm = AESGCM(aes_key)
     nonce = os.urandom(12)  # GCM standard nonce size
     ciphertext = aesgcm.encrypt(nonce, file_data, None)
     return nonce + ciphertext  # Return nonce + ciphertext (includes auth tag)
 
 def decrypt_file_aes(encrypted_data, aes_key):
-    """Decrypts file data using AES-256-GCM (verifies authentication)"""
+    """
+    Decrypts file data using AES-256-GCM and verifies authentication tag.
+    
+    Security:
+    - Verifies authentication tag before returning plaintext
+    - Raises exception if data has been tampered with
+    - Constant-time tag comparison prevents timing attacks
+    """
     aesgcm = AESGCM(aes_key)
     nonce = encrypted_data[:12]
     ciphertext = encrypted_data[12:]
@@ -53,10 +108,21 @@ def decrypt_aes_key_rsa(encrypted_aes_key, receiver_private_key):
         )
     )
 
-# --- SIGNATURE HELPERS ---
+# Signature Helpers
 
 def sign_data(data, sender_private_key):
-    """Signs the data using Sender's Private Key (Non-Repudiation/Integrity)"""
+    """
+    Creates a digital signature using RSA-PSS with SHA-256.
+    
+    Security (Non-Repudiation):
+    - Only the private key holder can create valid signatures
+    - Provides proof of authorship and data integrity
+    - PSS padding: Probabilistic signature scheme (more secure than PKCS#1 v1.5)
+    - MAX_LENGTH salt: Maximum security against forgery attempts
+    - SHA-256 hash: Collision-resistant hash function
+    
+    Returns: Digital signature (bytes)
+    """
     return sender_private_key.sign(
         data,
         padding.PSS(
@@ -67,7 +133,17 @@ def sign_data(data, sender_private_key):
     )
 
 def verify_signature(data, signature, sender_public_key):
-    """Verifies the signature using Sender's Public Key"""
+    """
+    Verifies a digital signature using RSA-PSS with SHA-256.
+    
+    Security:
+    - Verifies both data integrity and authenticity
+    - Anyone with public key can verify, but only private key holder can sign
+    - Raises exception if signature is invalid or data has been modified
+    - Constant-time comparison prevents timing attacks
+    
+    Returns: True if valid, False if invalid (catches exceptions)
+    """
     try:
         sender_public_key.verify(
             signature,
@@ -82,7 +158,7 @@ def verify_signature(data, signature, sender_public_key):
     except Exception:
         return False
 
-# --- USER KEY GENERATION FOR NON-REPUDIATION ---
+# User Key Generation for Non-Repudiation
 
 def generate_user_keypair():
     """Generates a new RSA keypair for a user (2048-bit)"""

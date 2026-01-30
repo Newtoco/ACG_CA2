@@ -88,14 +88,17 @@ function renderLogin() {
     const app = document.getElementById('app');
     app.innerHTML = `
         <h2>🔐 Secure Vault</h2>
+        <p class="info-text" style="margin-bottom: 20px;">
+            Protected with AES-256-GCM encryption and two-factor authentication
+        </p>
         <div id="login-form">
             <div class="input-group">
                 <label for="u">Username</label>
-                <input type="text" id="u" placeholder="Enter your username">
+                <input type="text" id="u" placeholder="Enter your username" autocomplete="username">
             </div>
             <div class="input-group">
                 <label for="p">Password</label>
-                <input type="password" id="p" placeholder="Enter your password">
+                <input type="password" id="p" placeholder="Enter your password" autocomplete="current-password">
             </div>
             <button onclick="handleLogin()">Login</button>
             <button onclick="renderRegister()" class="secondary">Register New Account</button>
@@ -103,11 +106,14 @@ function renderLogin() {
         <div id="mfa-form" class="hidden">
             <h3>🔢 Two-Factor Authentication</h3>
             <p class="info-text">Open Google Authenticator and enter the 6-digit code:</p>
-            <input type="text" id="otp-input" placeholder="000 000" maxlength="7" style="text-align:center; letter-spacing: 5px; font-size: 1.2em;">
+            <input type="text" id="otp-input" placeholder="000 000" maxlength="7" style="text-align:center; letter-spacing: 5px; font-size: 1.2em;" autocomplete="one-time-code">
             <button onclick="submitOtp()">Verify Code</button>
             <button onclick="renderLogin()" class="secondary">Back to Login</button>
         </div>
     `;
+    
+    // Auto-focus username field
+    setTimeout(() => document.getElementById('u')?.focus(), 100);
 }
 
 function renderRegister() {
@@ -151,7 +157,10 @@ function renderDashboard(username) {
         <h2>📦 Vault: ${username}</h2>
         <div class="input-group">
             <label for="f">Select File to Upload</label>
-            <input type="file" id="f">
+            <input type="file" id="f" onchange="handleFileSelect(this)">
+            <label for="f" class="file-upload-button" id="file-upload-label">
+                <span class="file-name-display">Click to choose a file</span>
+            </label>
         </div>
         <button type="button" onclick="uploadFile(event)" class="success">
             <span style="font-size:1.1rem;">↑</span> Upload File
@@ -169,6 +178,20 @@ function renderDashboard(username) {
         <button onclick="handleLogout()" class="secondary" style="margin-top:20px">Log Out</button>
     `;
     loadFiles();
+}
+
+// Add file select handler
+function handleFileSelect(input) {
+    const label = document.getElementById('file-upload-label');
+    const fileName = input.files[0]?.name || 'Click to choose a file';
+    
+    if (input.files[0]) {
+        label.classList.add('has-file');
+        label.innerHTML = `<span class="file-name-display">${fileName}</span>`;
+    } else {
+        label.classList.remove('has-file');
+        label.innerHTML = `<span class="file-name-display">Click to choose a file</span>`;
+    }
 }
 
 // -- VALIDATION --
@@ -385,6 +408,12 @@ async function uploadFile(event, isOverwrite = false) {
 
         if (res.ok) {
             fileInput.value = '';
+            // Reset the custom file upload button
+            const label = document.getElementById('file-upload-label');
+            if (label) {
+                label.classList.remove('has-file');
+                label.innerHTML = `<span class="file-name-display">Click to choose a file</span>`;
+            }
             showToast('Success', data.message || 'File uploaded', 'success');
             loadFiles();
         }
