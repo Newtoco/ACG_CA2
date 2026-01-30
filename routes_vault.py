@@ -6,6 +6,10 @@ from werkzeug.utils import secure_filename
 from config import UPLOAD_FOLDER, get_gcm_cipher, db
 from models import File
 from utils import token_required, log_action
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import serialization
+import base64
 
 vault_bp = Blueprint('vault', __name__)
 
@@ -21,6 +25,18 @@ def validate_file_type(file_storage):
     allowed = ['text/plain', 'application/pdf', 'image/png', 'image/jpeg']
     return mime in allowed
 
+# Helper to load your private key
+def get_private_key():
+    with open("key.pem", "rb") as key_file:
+        return serialization.load_pem_private_key(key_file.read(), password=None)
+
+# Helper to load the public key (from your cert.pem)
+def get_public_key():
+    with open("cert.pem", "rb") as cert_file:
+        from cryptography import x509
+        cert = x509.load_pem_x509_certificate(cert_file.read())
+        return cert.public_key()
+
 @vault_bp.route('/upload', methods=['POST'])
 @token_required
 def upload(current_user):
@@ -33,7 +49,7 @@ def upload(current_user):
     
     filename = secure_filename(file.filename)
 
-    # --- NEW CHECK: PREVENT DUPLICATES ---
+    # --- PREVENT DUPLICATES ---
     existing_file = File.query.filter_by(user_id=current_user.id, original_filename=filename).first()
 
     # Check for an 'overwrite' flag in the request (e.g., from a query param or JSON body)
@@ -57,6 +73,18 @@ def upload(current_user):
     file_ext = os.path.splitext(filename)[1]
     storage_name = f"{file_uuid}{file_ext}"
 
+    file_data = file.read()
+
+    # --- NON-REPUDIATION: SIGNING ---
+    private_key = get_private_key()
+    signature = private_key.sign(
+        file_data,
+        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+        hashes.SHA256()
+    )
+    # Convert signature to string for DB storage
+    signature_b64 = base64.b64encode(signature).decode('utf-8')
+
     # Encrypt
     # 1. Generate a 12-byte nonce (Standard for GCM)
     nonce = os.urandom(12)
@@ -67,7 +95,6 @@ def upload(current_user):
     encryptor = cipher.encryptor()
 
     # 3. Encrypt and extract the Tag
-    file_data = file.read()
     ciphertext = encryptor.update(file_data) + encryptor.finalize()
     tag = encryptor.tag
 
@@ -81,7 +108,8 @@ def upload(current_user):
     file_record = File(
         user_id=current_user.id,
         original_filename=filename,
-        storage_name=storage_name
+        storage_name=storage_name,
+        signature=signature_b64
     )
     db.session.add(file_record)
     db.session.commit()
@@ -125,14 +153,28 @@ def download(current_user):
     cipher = get_gcm_cipher(nonce, tag)
     decryptor = cipher.decryptor()
 
-    # 4. Decrypt and Verify
+    # 4. Decrypt and Verify Integrity (GCM Tag)
     try:
-        # If the tag doesn't match the ciphertext, .finalize() raises InvalidTag
         decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
-    except Exception as e:
-        # This is where GCM shines: it catches tampering!
-        log_action(current_user.id, "DECRYPT_FAILURE", f"Integrity check failed for {filename}")
-        return jsonify({'message': 'File corrupted or tampered with'}), 400
+    except Exception:
+        log_action(current_user.id, "TAMPER_DETECTED", filename)
+        return jsonify({'message': 'Integrity check failed'}), 400
+
+    # --- NON-REPUDIATION: VERIFY SIGNATURE ---
+    if file_record.signature:
+        public_key = get_public_key()
+        signature = base64.b64decode(file_record.signature)
+        try:
+            public_key.verify(
+                signature,
+                decrypted_data,
+                padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+                hashes.SHA256()
+            )
+            print("Non-repudiation Verified")
+        except Exception:
+            return jsonify({'message': 'Non-repudiation check failed: Signature mismatch'}), 400
+
 
     log_action(current_user.id, "DOWNLOAD", filename)
 

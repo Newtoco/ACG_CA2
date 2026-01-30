@@ -21,6 +21,7 @@ class File(db.Model):
     original_filename = db.Column(db.String(200), nullable=False)
     storage_name = db.Column(db.String(200), unique=True, nullable=False)
     upload_date = db.Column(db.DateTime, default=datetime.utcnow)
+    signature = db.Column(db.Text, nullable=True)
 
 # ---Enhanced Audit Logs ---
 class AuditLog(db.Model):
