@@ -372,7 +372,7 @@ The system implements multiple security layers:
 2. Application layer: JWT session tokens, CSRF protection
 3. Authentication layer: Dual-factor (password + TOTP)
 4. Authorization layer: User isolation, permission checks
-5. Data layer: Encrypted storage, database separation, encrypted private keys
+5. Data layer: Encrypted storage, database separation, encrypted private keys, only approved file formats
 6. Audit layer: Comprehensive logging, immutable records
 7. Key management: Password-encrypted private keys, secure key derivation (PBKDF2)
 8. Session security: Server-side storage, automatic key cleanup
