@@ -1,4 +1,6 @@
 """
+Contributors: Anson, Denzel
+Anson, Denzel: AES-256-GCM encryption, RSA-PSS digital signatures, and automated key management
 Cryptographic Utilities
 
 Provides cryptographic operations for the secure file vault.
