@@ -1,3 +1,5 @@
+# Cedric's Code
+
 import os, glob, shutil
 from datetime import datetime
 
@@ -18,3 +20,4 @@ for old in backups[:-KEEP]:
     os.remove(old)
 
 print("Backup created:", dst)
+

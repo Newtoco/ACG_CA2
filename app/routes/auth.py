@@ -1,4 +1,10 @@
 """
+Contributors: Anson, Ewean, Cedric
+
+Anson: base system architecture, non repudiation using signature signing, key storage encryption and retrival, 2FA
+Ewean: Brute Force protection, input sanitation, Secure Session Management
+Cedric: Audit logging
+
 Authentication Routes
 
 Handles user registration, login, 2FA verification, and session management.

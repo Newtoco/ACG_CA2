@@ -1,4 +1,8 @@
 """
+Contributors Anson, JunJie
+Anson: base system architecture
+JunJie: AES GCM setup
+
 Configuration Module
 
 Centralized configuration for the Secure File Vault application.

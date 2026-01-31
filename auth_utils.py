@@ -1,4 +1,10 @@
 """
+
+Contributors: Anson, Cedric, JunJie
+
+Anson, Junjie: Decorator for protecting routes with JWT authentication
+Cedric: Audit logging
+
 Authentication Utilities
 
 Provides authentication helpers and audit logging functionality.
