@@ -205,6 +205,7 @@ The application requires the following Python packages (from `requirements.txt`)
 - **pyotp** - TOTP implementation
 - **qrcode** - QR code generation
 - **pillow** - Image processing for QR codes
+- **magic**  - Provides file extension checks
 
 ## ⚠️ Security Warnings
 
