@@ -265,6 +265,7 @@ After 5 failed attempts, your account will be locked for 15 minutes.
 ### Encryption Standards
 
 **File Encryption:**
+- Only .txt,.jpeg,.png and .pdf file formats allowed
 - Algorithm: AES-256-GCM (Galois/Counter Mode)
 - Authenticated encryption with integrity verification
 - Unique nonce per file encryption operation
@@ -371,7 +372,7 @@ The system implements multiple security layers:
 2. Application layer: JWT session tokens, CSRF protection
 3. Authentication layer: Dual-factor (password + TOTP)
 4. Authorization layer: User isolation, permission checks
-5. Data layer: Encrypted storage, database separation, encrypted private keys
+5. Data layer: Encrypted storage, database separation, encrypted private keys, only approved file formats
 6. Audit layer: Comprehensive logging, immutable records
 7. Key management: Password-encrypted private keys, secure key derivation (PBKDF2)
 8. Session security: Server-side storage, automatic key cleanup
@@ -472,6 +473,7 @@ The application requires these Python packages (see requirements.txt):
 - pyotp - TOTP implementation for two-factor authentication
 - qrcode - QR code generation for TOTP setup
 - pillow - Image processing for QR codes
+- magic - File header check for approved file formats 
 
 **Database:**
 - SQLAlchemy - ORM and database abstraction
