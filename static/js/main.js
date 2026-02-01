@@ -2,6 +2,7 @@
 Anson: base system architecture, front end
 Denzel: Admin Audit log dashboard
 JunJie: Overwrite prompt
+Ewean: Confirmation of otp, changed password check prompt.
 */
 
 // Global variables
@@ -334,7 +335,7 @@ async function handleRegister() {
     if (!validateInput(pInput, 'Password is required')) return;
 
     if (pInput.value.length < 6) {
-        showToast('Weak Password', 'Password must be at least 6 characters', 'warning');
+        showToast('Weak Password', 'Password must be at least 12 characters', 'warning');
         pInput.classList.add('error');
         setTimeout(() => pInput.classList.remove('error'), 500);
         return;

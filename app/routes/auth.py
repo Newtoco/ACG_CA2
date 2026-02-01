@@ -109,7 +109,7 @@ def register():
     # Security Check: Password Strength
     if not is_strong_password(password):
         return jsonify({
-            'message': 'Weak Password. Must be 8+ chars and include: Upper, Lower, Number, Symbol (!@#$%).'
+            'message': 'Weak Password. Must be 12+ chars and include: Upper, Lower, Number, Symbol (!@#$%).'
         }), 400
 
     hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
