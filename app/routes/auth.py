@@ -7,7 +7,7 @@ Security Controls:
 
 1. Registration Security:
    - Username sanitization (alphanumeric only, prevents SQL injection)
-   - Strong password enforcement (8+ chars, mixed case, digits, symbols)
+   - Strong password enforcement (12+ chars, mixed case, digits, symbols)
    - Bcrypt password hashing with adaptive cost factor
    - Automatic RSA keypair generation for non-repudiation
    - TOTP secret generation for 2FA
@@ -67,9 +67,8 @@ def is_safe_input(input_str):
 def is_strong_password(password):
     """
     Enforces strong password complexity to prevent Dictionary Attacks.
-    Requirements: 8+ chars, Upper, Lower, Digit, Symbol.
+    Requirements: 12+ chars, Upper, Lower, Digit, Symbol.
     """
-    if len(password) < 8: return False
     if len(password) < 12: return False
     if not re.search(r"[a-z]", password): return False
     if not re.search(r"[A-Z]", password): return False
