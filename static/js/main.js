@@ -62,7 +62,7 @@ function showConfirmModal(title, message, onConfirm) {
             <div class="modal-body">${message}</div>
             <div class="modal-footer">
                 <button class="secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-                <button class="danger" id="modal-confirm">Overwrite</button>
+                <button class="danger" id="modal-confirm">Delete</button>
             </div>
         </div>
     `;
