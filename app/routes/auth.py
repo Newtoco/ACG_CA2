@@ -70,6 +70,7 @@ def is_strong_password(password):
     Requirements: 8+ chars, Upper, Lower, Digit, Symbol.
     """
     if len(password) < 8: return False
+    if len(password) < 12: return False
     if not re.search(r"[a-z]", password): return False
     if not re.search(r"[A-Z]", password): return False
     if not re.search(r"[0-9]", password): return False
