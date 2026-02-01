@@ -55,7 +55,7 @@ function showConfirmModal(title, message, onConfirm) {
             <div class="modal-body">${message}</div>
             <div class="modal-footer">
                 <button class="secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-                <button class="danger" id="modal-confirm">Delete</button>
+                <button class="danger" id="modal-confirm">Overwrite</button>
             </div>
         </div>
     `;
@@ -88,14 +88,17 @@ function renderLogin() {
     const app = document.getElementById('app');
     app.innerHTML = `
         <h2>🔐 Secure Vault</h2>
+        <p class="info-text" style="margin-bottom: 20px;">
+            Protected with AES-256-GCM encryption and two-factor authentication
+        </p>
         <div id="login-form">
             <div class="input-group">
                 <label for="u">Username</label>
-                <input type="text" id="u" placeholder="Enter your username">
+                <input type="text" id="u" placeholder="Enter your username" autocomplete="username">
             </div>
             <div class="input-group">
                 <label for="p">Password</label>
-                <input type="password" id="p" placeholder="Enter your password">
+                <input type="password" id="p" placeholder="Enter your password" autocomplete="current-password">
             </div>
             <button onclick="handleLogin()">Login</button>
             <button onclick="renderRegister()" class="secondary">Register New Account</button>
@@ -103,11 +106,14 @@ function renderLogin() {
         <div id="mfa-form" class="hidden">
             <h3>🔢 Two-Factor Authentication</h3>
             <p class="info-text">Open Google Authenticator and enter the 6-digit code:</p>
-            <input type="text" id="otp-input" placeholder="000 000" maxlength="7" style="text-align:center; letter-spacing: 5px; font-size: 1.2em;">
+            <input type="text" id="otp-input" placeholder="000 000" maxlength="7" style="text-align:center; letter-spacing: 5px; font-size: 1.2em;" autocomplete="one-time-code">
             <button onclick="submitOtp()">Verify Code</button>
             <button onclick="renderLogin()" class="secondary">Back to Login</button>
         </div>
     `;
+    
+    // Auto-focus username field
+    setTimeout(() => document.getElementById('u')?.focus(), 100);
 }
 
 function renderRegister() {
@@ -151,7 +157,10 @@ function renderDashboard(username) {
         <h2>📦 Vault: ${username}</h2>
         <div class="input-group">
             <label for="f">Select File to Upload</label>
-            <input type="file" id="f">
+            <input type="file" id="f" onchange="handleFileSelect(this)">
+            <label for="f" class="file-upload-button" id="file-upload-label">
+                <span class="file-name-display">Click to choose a file</span>
+            </label>
         </div>
         <button type="button" onclick="uploadFile(event)" class="success">
             <span style="font-size:1.1rem;">↑</span> Upload File
@@ -169,6 +178,20 @@ function renderDashboard(username) {
         <button onclick="handleLogout()" class="secondary" style="margin-top:20px">Log Out</button>
     `;
     loadFiles();
+}
+
+// Add file select handler
+function handleFileSelect(input) {
+    const label = document.getElementById('file-upload-label');
+    const fileName = input.files[0]?.name || 'Click to choose a file';
+    
+    if (input.files[0]) {
+        label.classList.add('has-file');
+        label.innerHTML = `<span class="file-name-display">${fileName}</span>`;
+    } else {
+        label.classList.remove('has-file');
+        label.innerHTML = `<span class="file-name-display">Click to choose a file</span>`;
+    }
 }
 
 // -- VALIDATION --
@@ -349,8 +372,15 @@ async function handleRegister() {
 
 async function handleLogout() { 
     try {
-        await fetch('/logout', {method: 'POST'});
-        showToast('Logged Out', 'See you next time!', 'success', 1500);
+        const response = await fetch('/logout', {method: 'POST'});
+        const data = await response.json();
+        
+        // Show detailed message about session clearing
+        const message = data.private_key_cleared 
+            ? 'Session key cleared from memory' 
+            : 'See you next time!';
+        
+        showToast('Logged Out', message, 'success', 1500);
         setTimeout(() => window.location.href = '/', 1500);
     } catch(e) {
         window.location.href = '/';
@@ -358,37 +388,54 @@ async function handleLogout() {
 }
 
 // -- FILE OPERATIONS --
-async function uploadFile(event) {
-    //Stop the page from reloading/submitting
+async function uploadFile(event, isOverwrite = false) {
     if (event) event.preventDefault();
 
     const fileInput = document.getElementById('f');
-    if (!fileInput.files[0]) {
+    const file = fileInput.files[0];
+
+    if (!file && !isOverwrite) {
         showToast('No File Selected', 'Please select a file to upload', 'warning');
         return;
     }
 
-
-    const btn = event ? event.target.closest('button') : null;
+    const btn = document.querySelector('button.success');
     if (btn) setButtonLoading(btn, true);
 
     try {
         const fd = new FormData();
-        fd.append('file', fileInput.files[0]);
+        // If we are retrying, we use the file we already have in the input
+        fd.append('file', file);
 
-        const res = await fetch('/upload', { method: 'POST', body: fd });
+        // Append the overwrite flag to the URL if this is a second attempt
+        const url = isOverwrite ? '/upload?overwrite=true' : '/upload';
 
-        // Read the response text from the server
+        const res = await fetch(url, { method: 'POST', body: fd });
         const data = await res.json();
 
         if (res.ok) {
-            // Success Case (200 OK)
             fileInput.value = '';
-            showToast('Upload Complete', data.message || 'File uploaded', 'success');
+            // Reset the custom file upload button
+            const label = document.getElementById('file-upload-label');
+            if (label) {
+                label.classList.remove('has-file');
+                label.innerHTML = `<span class="file-name-display">Click to choose a file</span>`;
+            }
+            showToast('Success', data.message || 'File uploaded', 'success');
             loadFiles();
-        } else {
-            // 4. FIX: Handle the Security Error (400 Bad Request)
-            // This displays "Security Alert: File type mismatch..."
+        }
+        else if (res.status === 409) {
+            // --- THE NEW LOGIC: HANDLE CONFLICT ---
+            showConfirmModal(
+                'Overwrite File?',
+                `${file.name} already exists. Do you want to replace the existing version?`,
+                () => {
+                    // User clicked "Delete/Confirm" - call itself with overwrite flag
+                    uploadFile(null, true);
+                }
+            );
+        }
+        else {
             showToast('Upload Rejected', data.message, 'error', 6000);
         }
     } catch(e) {
@@ -398,7 +445,6 @@ async function uploadFile(event) {
         if (btn) setButtonLoading(btn, false);
     }
 }
-
 async function loadFiles() {
     try {
         const res = await fetch('/list-files');

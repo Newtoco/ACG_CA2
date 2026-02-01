@@ -1,0 +1,70 @@
+# Security-sensitive files - NEVER commit these!
+certs/
+cert.pem
+key.pem
+file_key.key
+
+# RSA Keys (if generated)
+keys/
+*.pem
+
+# Databases with user data and audit logs
+instance/
+*.db
+
+# Uploaded encrypted files
+secure_vault_storage/
+
+# Server-side session files (runtime artifacts)
+flask_session/
+
+# Audit backups
+backups/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Environment variables (if used in future)
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/

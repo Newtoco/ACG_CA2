@@ -1,6 +1,7 @@
 Flask
 Flask-SQLAlchemy
 Flask-Bcrypt
+Flask-Session
 PyJWT
 cryptography
 Werkzeug
