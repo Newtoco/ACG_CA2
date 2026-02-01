@@ -1,4 +1,5 @@
 """
+Denzel's code
 Admin User Creation Script
 
 Creates an initial admin user with full vault access and 2FA enabled.

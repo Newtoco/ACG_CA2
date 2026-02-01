@@ -1,3 +1,9 @@
+/* Contributors: Anson, Denzel, Ewean, JunJie
+Anson: base system architecture, front end
+Denzel: Admin Audit log dashboard
+JunJie: Overwrite prompt
+*/
+
 // Global variables
 let selectedFile = null;
 let tempUserId = null;

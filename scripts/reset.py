@@ -1,4 +1,6 @@
 """
+Anson's Code
+
 Reset Script for Secure Vault Application
 
 Cleans up all generated files and databases to reset the application to initial state.

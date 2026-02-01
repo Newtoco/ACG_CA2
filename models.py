@@ -1,4 +1,10 @@
 """
+Contributors: Cedric, Ewean, Anson,
+
+Anson: Main structure of models.py
+Ewean: Bruteforce protection audit logs and user class
+Cedric: Main Audit logs code
+
 Database Models
 
 Defines the database schema for users, files, and audit logs.
@@ -63,7 +69,7 @@ class File(db.Model):
     upload_date = db.Column(db.DateTime, default=datetime.utcnow)
     signature = db.Column(db.Text, nullable=True)
 
-# Enhanced Audit Logs
+#  Audit Logs
 class AuditLog(db.Model):
     __bind_key__ = 'audit'
     id = db.Column(db.Integer, primary_key=True)
