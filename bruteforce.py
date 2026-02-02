@@ -7,7 +7,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # CONFIGURATION
 URL = "https://127.0.0.1:443/login"
-TARGET_USER = "admin"
+TARGET_USER = "user2"
 PASSWORD_LIST = [
     "password",
     "123456",
@@ -21,7 +21,7 @@ PASSWORD_LIST = [
     "123456",
     "admin",
     "letmeIN",
-    "AdminPassword123!"  # <--- The Correct Password
+    "1Qwerty^%$#@!"  # <--- The Correct Password
 ]
 
 
@@ -64,7 +64,9 @@ def run_attack():
 
             # CASE 3: Account Locked
             elif response.status_code == 429:
-                print("⛔ Rate Limited (Too Many Requests)")
+                print(f"⛔ ACCOUNT LOCKED: {data.get('message', 'Too Many Requests')}")
+                print("[!] Attack aborted: The account is now locked.")
+                break
 
         except Exception as e:
             print(f" [!] Request Error: {e}")
